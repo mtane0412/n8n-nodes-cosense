@@ -6,10 +6,10 @@ import { NodeApiError } from 'n8n-workflow';
 import { CosenseWebSocketClient } from './CosenseWebSocketClient';
 
 export interface CosenseCredentials {
-	projectName: string;
 	authenticationType?: 'sessionCookie' | 'serviceAccount';
 	sessionId?: string;
 	serviceAccountKey?: string;
+	projectName?: string;
 }
 
 export interface PageData {
@@ -71,7 +71,7 @@ export class CosenseApiClient {
 	private static readonly MAX_RETRY_DELAY = 60000; // 60秒
 	constructor(executeFunctions: IExecuteFunctions, credentials: CosenseCredentials, itemIndex: number) {
 		this.executeFunctions = executeFunctions;
-		this.projectName = credentials.projectName;
+		this.projectName = ''; // projectNameは各メソッドで個別に設定
 		this.authenticationType = credentials.authenticationType;
 		this.sessionId = credentials.sessionId;
 		this.serviceAccountKey = credentials.serviceAccountKey;
@@ -136,9 +136,9 @@ export class CosenseApiClient {
 		throw lastError;
 	}
 
-	async getPage(pageTitle: string): Promise<PageData> {
+	async getPage(projectName: string, pageTitle: string): Promise<PageData> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/pages/${this.projectName}/${encodeURIComponent(pageTitle)}`;
+		options.url = `${this.baseUrl}/pages/${projectName}/${encodeURIComponent(pageTitle)}`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -164,9 +164,9 @@ export class CosenseApiClient {
 		}, `getPage(${pageTitle})`);
 	}
 
-	async listPages(limit: number, skip: number): Promise<JsonObject[]> {
+	async listPages(projectName: string, limit: number, skip: number): Promise<JsonObject[]> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/pages/${this.projectName}?limit=${limit}&skip=${skip}`;
+		options.url = `${this.baseUrl}/pages/${projectName}?limit=${limit}&skip=${skip}`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -186,14 +186,14 @@ export class CosenseApiClient {
 		}, `listPages(limit=${limit}, skip=${skip})`);
 	}
 
-	async listAllPages(): Promise<JsonObject[]> {
+	async listAllPages(projectName: string): Promise<JsonObject[]> {
 		const allPages: JsonObject[] = [];
 		const pageSize = 100;
 		let skip = 0;
 		let hasMore = true;
 
 		while (hasMore) {
-			const pages = await this.listPages(pageSize, skip);
+			const pages = await this.listPages(projectName, pageSize, skip);
 			allPages.push(...pages);
 			
 			if (pages.length < pageSize) {
@@ -206,12 +206,12 @@ export class CosenseApiClient {
 		return allPages;
 	}
 
-	async searchPages(query: string, searchType: 'title' | 'fulltext', limit?: number): Promise<JsonObject[]> {
+	async searchPages(projectName: string, query: string, searchType: 'title' | 'fulltext', limit?: number): Promise<JsonObject[]> {
 		const options = this.getRequestOptions();
 		
 		if (searchType === 'title') {
 			// /search/titles エンドポイントは全ページを返すので、クライアント側でフィルタリング
-			options.url = `${this.baseUrl}/pages/${this.projectName}/search/titles`;
+			options.url = `${this.baseUrl}/pages/${projectName}/search/titles`;
 			
 			return this.executeWithRetry(async () => {
 				try {
@@ -236,7 +236,7 @@ export class CosenseApiClient {
 			}, `searchPages(${query}, ${searchType})`);
 		} else {
 			// フルテキスト検索
-			options.url = `${this.baseUrl}/pages/${this.projectName}/search/query?q=${encodeURIComponent(query)}&limit=${limit || 50}`;
+			options.url = `${this.baseUrl}/pages/${projectName}/search/query?q=${encodeURIComponent(query)}&limit=${limit || 50}`;
 			
 			return this.executeWithRetry(async () => {
 				try {
@@ -257,7 +257,7 @@ export class CosenseApiClient {
 		}
 	}
 
-	async createPage(data: CreatePageData): Promise<PageData> {
+	async createPage(projectName: string, data: CreatePageData): Promise<PageData> {
 		if (this.authenticationType === 'serviceAccount') {
 			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
 				message: 'Service Account authentication does not support write operations',
@@ -275,7 +275,7 @@ export class CosenseApiClient {
 			// まず既存のページが存在するかチェック
 			let existingPage: PageData | null = null;
 			try {
-				existingPage = await this.getPage(data.title);
+				existingPage = await this.getPage(projectName, data.title);
 			} catch (error: any) {
 				// 404エラーの場合はページが存在しないので、新規作成可能
 				if (error.response?.statusCode !== 404) {
@@ -289,14 +289,14 @@ export class CosenseApiClient {
 			if (existingPage) {
 				// 既存ページが存在する場合は末尾に追加
 				const lastLineNumber = existingPage.lines.length; // 最後の行の次の位置
-				await wsClient.insertLines(this.projectName, data.title, lastLineNumber, content);
+				await wsClient.insertLines(projectName, data.title, lastLineNumber, content);
 			} else {
 				// 新規ページ作成
-				await wsClient.createPage(this.projectName, data.title, content);
+				await wsClient.createPage(projectName, data.title, content);
 			}
 			
 			// 作成/更新後にページを取得して返す
-			return await this.getPage(data.title);
+			return await this.getPage(projectName, data.title);
 		} catch (error: any) {
 			throw new NodeApiError(this.executeFunctions.getNode(), error, {
 				message: 'Failed to create or update page',
@@ -305,7 +305,7 @@ export class CosenseApiClient {
 		}
 	}
 
-	async insertLines(pageTitle: string, data: InsertLinesData): Promise<PageData> {
+	async insertLines(projectName: string, pageTitle: string, data: InsertLinesData): Promise<PageData> {
 		if (this.authenticationType === 'serviceAccount') {
 			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
 				message: 'Service Account authentication does not support write operations',
@@ -322,10 +322,10 @@ export class CosenseApiClient {
 		try {
 			// WebSocketを使用して行を挿入
 			const wsClient = new CosenseWebSocketClient({ sessionId: this.sessionId });
-			await wsClient.insertLines(this.projectName, pageTitle, data.lineNumber, data.text);
+			await wsClient.insertLines(projectName, pageTitle, data.lineNumber, data.text);
 			
 			// 更新後にページを取得して返す
-			return await this.getPage(pageTitle);
+			return await this.getPage(projectName, pageTitle);
 		} catch (error: any) {
 			throw new NodeApiError(this.executeFunctions.getNode(), error, {
 				message: 'Failed to insert lines',
@@ -335,9 +335,9 @@ export class CosenseApiClient {
 	}
 
 	// Export/Import Methods
-	async exportPages(): Promise<JsonObject[]> {
+	async exportPages(projectName: string): Promise<JsonObject[]> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/pages/${this.projectName}?limit=10000`;
+		options.url = `${this.baseUrl}/pages/${projectName}?limit=10000`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -357,7 +357,7 @@ export class CosenseApiClient {
 		}, 'exportPages');
 	}
 
-	async importPages(pages: JsonObject[]): Promise<JsonObject> {
+	async importPages(projectName: string, pages: JsonObject[]): Promise<JsonObject> {
 		if (this.authenticationType === 'serviceAccount') {
 			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
 				message: 'Service Account authentication does not support write operations',
@@ -379,7 +379,7 @@ export class CosenseApiClient {
 		for (const page of pages) {
 			try {
 				if (typeof page.title === 'string' && Array.isArray(page.lines)) {
-					await wsClient.createPage(this.projectName, page.title, page.lines.slice(1).join('\n'));
+					await wsClient.createPage(projectName, page.title, page.lines.slice(1).join('\n'));
 					imported++;
 				} else {
 					failed++;
@@ -400,9 +400,9 @@ export class CosenseApiClient {
 	}
 
 	// History Methods
-	async getSnapshot(pageTitle: string, timestampId: string): Promise<PageData> {
+	async getSnapshot(projectName: string, pageTitle: string, timestampId: string): Promise<PageData> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/pages/${this.projectName}/${encodeURIComponent(pageTitle)}/${timestampId}`;
+		options.url = `${this.baseUrl}/pages/${projectName}/${encodeURIComponent(pageTitle)}/${timestampId}`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -428,9 +428,9 @@ export class CosenseApiClient {
 		}, `getSnapshot(${pageTitle}, ${timestampId})`);
 	}
 
-	async getTimestampIds(pageTitle: string): Promise<JsonObject[]> {
+	async getTimestampIds(projectName: string, pageTitle: string): Promise<JsonObject[]> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/pages/${this.projectName}/${encodeURIComponent(pageTitle)}/timestamps`;
+		options.url = `${this.baseUrl}/pages/${projectName}/${encodeURIComponent(pageTitle)}/timestamps`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -457,9 +457,9 @@ export class CosenseApiClient {
 	}
 
 	// Content Analysis Methods
-	async getTable(pageTitle: string, filename: string): Promise<JsonObject> {
+	async getTable(projectName: string, pageTitle: string, filename: string): Promise<JsonObject> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/table/${this.projectName}/${encodeURIComponent(pageTitle)}/${encodeURIComponent(filename)}.csv`;
+		options.url = `${this.baseUrl}/table/${projectName}/${encodeURIComponent(pageTitle)}/${encodeURIComponent(filename)}.csv`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -496,8 +496,8 @@ export class CosenseApiClient {
 		}, `getTable(${pageTitle}, ${filename})`);
 	}
 
-	async getCodeBlocks(pageTitle: string): Promise<JsonObject[]> {
-		const page = await this.getPage(pageTitle);
+	async getCodeBlocks(projectName: string, pageTitle: string): Promise<JsonObject[]> {
+		const page = await this.getPage(projectName, pageTitle);
 		const codeBlocks: JsonObject[] = [];
 		let inCodeBlock = false;
 		let currentBlock: string[] = [];
@@ -553,7 +553,7 @@ export class CosenseApiClient {
 	}
 
 	// Security Methods
-	async getCSRFToken(): Promise<JsonObject> {
+	async getCSRFToken(projectName: string): Promise<JsonObject> {
 		if (!this.sessionId) {
 			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
 				message: 'Session ID is required for getting CSRF token',
@@ -562,7 +562,7 @@ export class CosenseApiClient {
 		}
 
 		const options = this.getRequestOptions();
-		options.url = `https://scrapbox.io/${this.projectName}`;
+		options.url = `https://scrapbox.io/${projectName}`;
 		options.returnFullResponse = true;
 
 		return this.executeWithRetry(async () => {
@@ -714,10 +714,9 @@ export class CosenseApiClient {
 		}, 'getProjects');
 	}
 
-	async getProjectInfo(projectName?: string): Promise<JsonObject> {
-		const targetProjectName = projectName || this.projectName;
+	async getProjectInfo(projectName: string): Promise<JsonObject> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/projects/${targetProjectName}`;
+		options.url = `${this.baseUrl}/projects/${projectName}`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -726,7 +725,7 @@ export class CosenseApiClient {
 			} catch (error: any) {
 				if (error.response?.statusCode === 404) {
 					throw new NodeApiError(this.executeFunctions.getNode(), error, {
-						message: `Project "${targetProjectName}" not found`,
+						message: `Project "${projectName}" not found`,
 						description: 'The requested project could not be found. Please verify the project name.',
 					});
 				}
@@ -743,13 +742,13 @@ export class CosenseApiClient {
 					description: error.message || 'An error occurred while fetching project information',
 				});
 			}
-		}, `getProjectInfo(${targetProjectName})`);
+		}, `getProjectInfo(${projectName})`);
 	}
 
 	// History and Snapshot Methods
-	async getPageSnapshots(pageId: string): Promise<PageSnapshot[]> {
+	async getPageSnapshots(projectName: string, pageId: string): Promise<PageSnapshot[]> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/page-snapshots/${this.projectName}/${pageId}`;
+		options.url = `${this.baseUrl}/page-snapshots/${projectName}/${pageId}`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -778,9 +777,9 @@ export class CosenseApiClient {
 		}, `getPageSnapshots(${pageId})`);
 	}
 
-	async getPageSnapshotByTimestamp(pageId: string, timestampId: string): Promise<PageSnapshot> {
+	async getPageSnapshotByTimestamp(projectName: string, pageId: string, timestampId: string): Promise<PageSnapshot> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/page-snapshots/${this.projectName}/${pageId}/${timestampId}`;
+		options.url = `${this.baseUrl}/page-snapshots/${projectName}/${pageId}/${timestampId}`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -809,9 +808,9 @@ export class CosenseApiClient {
 		}, `getPageSnapshotByTimestamp(${pageId}, ${timestampId})`);
 	}
 
-	async getPageCommits(pageId: string): Promise<PageCommit[]> {
+	async getPageCommits(projectName: string, pageId: string): Promise<PageCommit[]> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/commits/${this.projectName}/${pageId}`;
+		options.url = `${this.baseUrl}/commits/${projectName}/${pageId}`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -841,8 +840,8 @@ export class CosenseApiClient {
 	}
 
 	// Helper method to get page ID from page title
-	async getPageIdByTitle(pageTitle: string): Promise<string> {
-		const page = await this.getPage(pageTitle);
+	async getPageIdByTitle(projectName: string, pageTitle: string): Promise<string> {
+		const page = await this.getPage(projectName, pageTitle);
 		if (!page.id) {
 			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
 				message: `Page ID not found for page "${pageTitle}"`,
@@ -853,9 +852,9 @@ export class CosenseApiClient {
 	}
 
 	// Backup Methods
-	async getProjectBackupList(): Promise<ProjectBackup[]> {
+	async getProjectBackupList(projectName: string): Promise<ProjectBackup[]> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/project-backup/${this.projectName}/list`;
+		options.url = `${this.baseUrl}/project-backup/${projectName}/list`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -878,9 +877,9 @@ export class CosenseApiClient {
 		}, 'getProjectBackupList');
 	}
 
-	async getProjectBackup(backupId: string): Promise<JsonObject> {
+	async getProjectBackup(projectName: string, backupId: string): Promise<JsonObject> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/project-backup/${this.projectName}/${backupId}.json`;
+		options.url = `${this.baseUrl}/project-backup/${projectName}/${backupId}.json`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -910,9 +909,9 @@ export class CosenseApiClient {
 	}
 
 	// Stream and Feed Methods
-	async getProjectStream(): Promise<JsonObject[]> {
+	async getProjectStream(projectName: string): Promise<JsonObject[]> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/stream/${this.projectName}/`;
+		options.url = `${this.baseUrl}/stream/${projectName}/`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -935,9 +934,9 @@ export class CosenseApiClient {
 		}, 'getProjectStream');
 	}
 
-	async getPageIcon(pageTitle: string): Promise<JsonObject> {
+	async getPageIcon(projectName: string, pageTitle: string): Promise<JsonObject> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/pages/${this.projectName}/${encodeURIComponent(pageTitle)}/icon`;
+		options.url = `${this.baseUrl}/pages/${projectName}/${encodeURIComponent(pageTitle)}/icon`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -967,9 +966,9 @@ export class CosenseApiClient {
 	}
 
 	// Notifications and Invitations Methods
-	async getProjectNotifications(): Promise<JsonObject> {
+	async getProjectNotifications(projectName: string): Promise<JsonObject> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/projects/${this.projectName}/notifications`;
+		options.url = `${this.baseUrl}/projects/${projectName}/notifications`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -998,9 +997,9 @@ export class CosenseApiClient {
 		}, 'getProjectNotifications');
 	}
 
-	async getProjectInvitations(): Promise<JsonObject> {
+	async getProjectInvitations(projectName: string): Promise<JsonObject> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/projects/${this.projectName}/invitations`;
+		options.url = `${this.baseUrl}/projects/${projectName}/invitations`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -1030,9 +1029,9 @@ export class CosenseApiClient {
 	}
 
 	// Deleted Pages and Feed Methods
-	async getDeletedPage(pageId: string): Promise<JsonObject> {
+	async getDeletedPage(projectName: string, pageId: string): Promise<JsonObject> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/deleted-pages/${this.projectName}/${pageId}`;
+		options.url = `${this.baseUrl}/deleted-pages/${projectName}/${pageId}`;
 
 		return this.executeWithRetry(async () => {
 			try {
@@ -1067,9 +1066,9 @@ export class CosenseApiClient {
 		}, `getDeletedPage(${pageId})`);
 	}
 
-	async getProjectFeed(): Promise<JsonObject> {
+	async getProjectFeed(projectName: string): Promise<JsonObject> {
 		const options = this.getRequestOptions();
-		options.url = `${this.baseUrl}/feed/${this.projectName}`;
+		options.url = `${this.baseUrl}/feed/${projectName}`;
 
 		return this.executeWithRetry(async () => {
 			try {

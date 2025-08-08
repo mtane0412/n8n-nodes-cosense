@@ -1,6 +1,6 @@
 /**
  * Cosense API認証情報の定義
- * プロジェクト名とセッションIDを保存する
+ * セッションIDまたはサービスアカウントキーを保存する
  */
 import type { ICredentialType, INodeProperties } from 'n8n-workflow';
 
@@ -27,15 +27,6 @@ export class CosenseApi implements ICredentialType {
 			],
 			default: 'sessionCookie',
 			description: 'Choose the authentication method',
-		},
-		{
-			displayName: 'Project Name',
-			name: 'projectName',
-			type: 'string',
-			default: '',
-			required: true,
-			placeholder: 'my-project',
-			description: 'The name of your Cosense/Scrapbox project',
 		},
 		{
 			displayName: 'Session ID (connect.sid)',

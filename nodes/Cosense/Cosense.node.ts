@@ -157,6 +157,21 @@ export class Cosense implements INodeType {
 				],
 				default: 'get',
 			},
+			// Project Name for Page operations
+			{
+				displayName: 'Project Name',
+				name: 'projectName',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['page'],
+					},
+				},
+				default: '',
+				placeholder: 'my-project',
+				description: 'The name of your Cosense/Scrapbox project',
+			},
 			// Get Page
 			{
 				displayName: 'Page Title',
@@ -586,6 +601,20 @@ export class Cosense implements INodeType {
 			},
 			// History - Get Snapshot Parameters
 			{
+				displayName: 'Project Name',
+				name: 'projectName',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['history'],
+					},
+				},
+				default: '',
+				placeholder: 'my-project',
+				description: 'The name of your Cosense/Scrapbox project',
+			},
+			{
 				displayName: 'Page Title',
 				name: 'historyPageTitle',
 				type: 'string',
@@ -615,20 +644,21 @@ export class Cosense implements INodeType {
 				placeholder: '1234567890',
 				description: 'The timestamp ID of the snapshot to retrieve',
 			},
-			// Project - Get Info Parameters
+			// Project - Project Name Parameter
 			{
 				displayName: 'Project Name',
-				name: 'projectNameParam',
+				name: 'projectName',
 				type: 'string',
+				required: true,
 				displayOptions: {
 					show: {
 						resource: ['project'],
-						projectOperation: ['getInfo'],
+						projectOperation: ['exportPages', 'getBackup', 'getBackupList', 'getFeed', 'getInfo', 'getInvitations', 'getNotifications', 'getStream', 'importPages'],
 					},
 				},
 				default: '',
-				placeholder: 'project-name',
-				description: 'Name of the project to get info for. Leave empty to use the project from credentials.',
+				placeholder: 'my-project',
+				description: 'The name of your Cosense/Scrapbox project',
 			},
 			// Backup ID (for Get Backup)
 			{
@@ -660,6 +690,21 @@ export class Cosense implements INodeType {
 				},
 				default: '[]',
 				description: 'JSON array of pages to import',
+			},
+			// Export/Import Project Parameters
+			{
+				displayName: 'Project Name',
+				name: 'projectName',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['exportImport'],
+					},
+				},
+				default: '',
+				placeholder: 'my-project',
+				description: 'The name of your Cosense/Scrapbox project',
 			},
 			// Import Project Parameters
 			{
@@ -722,32 +767,38 @@ export class Cosense implements INodeType {
 			try {
 				const apiClient = new CosenseApiClient(this, credentials, i);
 				let responseData;
+				
+				// Get project name based on resource type
+				let projectName = '';
+				if (['page', 'history', 'project', 'exportImport'].includes(resource)) {
+					projectName = this.getNodeParameter('projectName', i) as string;
+				}
 
 				if (resource === 'page') {
 					const operation = this.getNodeParameter('operation', i) as string;
 					if (operation === 'get') {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
-						responseData = await apiClient.getPage(pageTitle);
+						responseData = await apiClient.getPage(projectName, pageTitle);
 					} else if (operation === 'getCodeBlocks') {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
-						responseData = await apiClient.getCodeBlocks(pageTitle);
+						responseData = await apiClient.getCodeBlocks(projectName, pageTitle);
 					} else if (operation === 'getTable') {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
 						const tableFilename = this.getNodeParameter('tableFilename', i) as string;
-						responseData = await apiClient.getTable(pageTitle, tableFilename);
+						responseData = await apiClient.getTable(projectName, pageTitle, tableFilename);
 					} else if (operation === 'list') {
 						const returnAll = this.getNodeParameter('returnAll', i) as boolean;
 						if (returnAll) {
-							responseData = await apiClient.listAllPages();
+							responseData = await apiClient.listAllPages(projectName);
 						} else {
 							const limit = this.getNodeParameter('limit', i) as number;
-							responseData = await apiClient.listPages(limit, 0);
+							responseData = await apiClient.listPages(projectName, limit, 0);
 						}
 					} else if (operation === 'search') {
 						const query = this.getNodeParameter('query', i) as string;
 						const searchType = this.getNodeParameter('searchType', i) as string;
 						const limit = this.getNodeParameter('searchLimit', i) as number;
-						responseData = await apiClient.searchPages(query, searchType as 'title' | 'fulltext', limit);
+						responseData = await apiClient.searchPages(projectName, query, searchType as 'title' | 'fulltext', limit);
 					} else if (operation === 'create') {
 						const title = this.getNodeParameter('createPageTitle', i) as string;
 						const content = this.getNodeParameter('content', i) as string;
@@ -756,56 +807,55 @@ export class Cosense implements INodeType {
 						if (content && content.trim()) {
 							lines.push(...content.split('\n'));
 						}
-						responseData = await apiClient.createPage({ title, lines });
+						responseData = await apiClient.createPage(projectName, { title, lines });
 					} else if (operation === 'insertLines') {
 						const pageTitle = this.getNodeParameter('insertPageTitle', i) as string;
 						const lineNumber = this.getNodeParameter('lineNumber', i) as number;
 						const text = this.getNodeParameter('insertText', i) as string;
-						responseData = await apiClient.insertLines(pageTitle, { lineNumber, text });
+						responseData = await apiClient.insertLines(projectName, pageTitle, { lineNumber, text });
 					} else if (operation === 'getSnapshots') {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
-						const pageId = await apiClient.getPageIdByTitle(pageTitle);
-						responseData = await apiClient.getPageSnapshots(pageId);
+						const pageId = await apiClient.getPageIdByTitle(projectName, pageTitle);
+						responseData = await apiClient.getPageSnapshots(projectName, pageId);
 					} else if (operation === 'getSnapshot') {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
 						const timestampId = this.getNodeParameter('timestampId', i) as string;
-						const pageId = await apiClient.getPageIdByTitle(pageTitle);
-						responseData = await apiClient.getPageSnapshotByTimestamp(pageId, timestampId);
+						const pageId = await apiClient.getPageIdByTitle(projectName, pageTitle);
+						responseData = await apiClient.getPageSnapshotByTimestamp(projectName, pageId, timestampId);
 					} else if (operation === 'getCommits') {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
-						const pageId = await apiClient.getPageIdByTitle(pageTitle);
-						responseData = await apiClient.getPageCommits(pageId);
+						const pageId = await apiClient.getPageIdByTitle(projectName, pageTitle);
+						responseData = await apiClient.getPageCommits(projectName, pageId);
 					} else if (operation === 'getIcon') {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
-						responseData = await apiClient.getPageIcon(pageTitle);
+						responseData = await apiClient.getPageIcon(projectName, pageTitle);
 					} else if (operation === 'getDeleted') {
 						const pageId = this.getNodeParameter('deletedPageId', i) as string;
-						responseData = await apiClient.getDeletedPage(pageId);
+						responseData = await apiClient.getDeletedPage(projectName, pageId);
 					}
 				} else if (resource === 'project') {
 					const operation = this.getNodeParameter('projectOperation', i) as string;
 					if (operation === 'exportPages') {
-						responseData = await apiClient.exportPages();
+						responseData = await apiClient.exportPages(projectName);
 					} else if (operation === 'getInfo') {
-						const projectName = this.getNodeParameter('projectNameParam', i) as string;
-						responseData = await apiClient.getProjectInfo(projectName || undefined);
+						responseData = await apiClient.getProjectInfo(projectName);
 					} else if (operation === 'importPages') {
 						const pagesData = this.getNodeParameter('pagesData', i) as string;
 						const pages = JSON.parse(pagesData) as JsonObject[];
-						responseData = await apiClient.importPages(pages);
+						responseData = await apiClient.importPages(projectName, pages);
 					} else if (operation === 'getBackupList') {
-						responseData = await apiClient.getProjectBackupList();
+						responseData = await apiClient.getProjectBackupList(projectName);
 					} else if (operation === 'getBackup') {
 						const backupId = this.getNodeParameter('backupId', i) as string;
-						responseData = await apiClient.getProjectBackup(backupId);
+						responseData = await apiClient.getProjectBackup(projectName, backupId);
 					} else if (operation === 'getStream') {
-						responseData = await apiClient.getProjectStream();
+						responseData = await apiClient.getProjectStream(projectName);
 					} else if (operation === 'getNotifications') {
-						responseData = await apiClient.getProjectNotifications();
+						responseData = await apiClient.getProjectNotifications(projectName);
 					} else if (operation === 'getInvitations') {
-						responseData = await apiClient.getProjectInvitations();
+						responseData = await apiClient.getProjectInvitations(projectName);
 					} else if (operation === 'getFeed') {
-						responseData = await apiClient.getProjectFeed();
+						responseData = await apiClient.getProjectFeed(projectName);
 					}
 				} else if (resource === 'user') {
 					const operation = this.getNodeParameter('userOperation', i) as string;
@@ -819,25 +869,25 @@ export class Cosense implements INodeType {
 					const pageTitle = this.getNodeParameter('historyPageTitle', i) as string;
 					if (operation === 'getSnapshot') {
 						const timestampId = this.getNodeParameter('timestampId', i) as string;
-						responseData = await apiClient.getSnapshot(pageTitle, timestampId);
+						responseData = await apiClient.getSnapshot(projectName, pageTitle, timestampId);
 					} else if (operation === 'getTimestampIds') {
-						responseData = await apiClient.getTimestampIds(pageTitle);
+						responseData = await apiClient.getTimestampIds(projectName, pageTitle);
 					}
 				} else if (resource === 'exportImport') {
 					const operation = this.getNodeParameter('exportImportOperation', i) as string;
 					if (operation === 'exportProject') {
-						responseData = await apiClient.exportPages();
+						responseData = await apiClient.exportPages(projectName);
 					} else if (operation === 'importProject') {
 						const projectData = this.getNodeParameter('projectData', i) as string;
 						const data = JSON.parse(projectData) as JsonObject;
 						// Handle project data format
 						const pages = Array.isArray(data) ? data : data.pages as JsonObject[] || [];
-						responseData = await apiClient.importPages(pages);
+						responseData = await apiClient.importPages(projectName, pages);
 					}
 				} else if (resource === 'external') {
 					const operation = this.getNodeParameter('externalOperation', i) as string;
 					if (operation === 'getCSRFToken') {
-						responseData = await apiClient.getCSRFToken();
+						responseData = await apiClient.getCSRFToken(projectName);
 					} else if (operation === 'getGyazoToken') {
 						responseData = await apiClient.getGyazoToken();
 					} else if (operation === 'getTweetInfo') {

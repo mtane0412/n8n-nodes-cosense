@@ -33,14 +33,13 @@ describe('CosenseApiClient', () => {
 
 		apiClient = new CosenseApiClient(
 			mockExecuteFunctions,
-			{ projectName: 'test-project', sessionId: 'test-session' },
+			{ sessionId: 'test-session' },
 			0
 		);
 
 		serviceAccountApiClient = new CosenseApiClient(
 			mockExecuteFunctions,
 			{ 
-				projectName: 'test-project', 
 				authenticationType: 'serviceAccount',
 				serviceAccountKey: 'test-service-account-key'
 			},
@@ -58,7 +57,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-			const result = await apiClient.getPage('Test Page');
+			const result = await apiClient.getPage('test-project', 'Test Page');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -76,7 +75,7 @@ describe('CosenseApiClient', () => {
 			(error as any).response = { statusCode: 404 };
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
 
-			await expect(apiClient.getPage('Non-existent')).rejects.toThrow(NodeApiError);
+			await expect(apiClient.getPage('test-project', 'Non-existent')).rejects.toThrow(NodeApiError);
 		});
 	});
 
@@ -91,7 +90,7 @@ describe('CosenseApiClient', () => {
 			// WebSocket実装では、作成後にページを取得するため
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockPageResponse);
 
-			const result = await apiClient.createPage({
+			const result = await apiClient.createPage('test-project', {
 				title: 'New Page',
 				lines: ['Title', 'Content'],
 			});
@@ -115,7 +114,7 @@ describe('CosenseApiClient', () => {
 				0
 			);
 
-			await expect(apiClient.createPage({
+			await expect(apiClient.createPage('test-project', {
 				title: 'New Page',
 				lines: ['Content'],
 			})).rejects.toThrow(NodeApiError);
@@ -132,7 +131,7 @@ describe('CosenseApiClient', () => {
 			// WebSocket実装では、最後にページを取得するため
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(updatedPage);
 
-			const result = await apiClient.insertLines('Test Page', {
+			const result = await apiClient.insertLines('test-project', 'Test Page', {
 				lineNumber: 0,
 				text: 'Inserted Line',
 			});
@@ -157,7 +156,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(updatedPage);
 
-			const result = await apiClient.insertLines('Test Page', {
+			const result = await apiClient.insertLines('test-project', 'Test Page', {
 				lineNumber: 0,
 				text: 'Line A\nLine B\nLine C',
 			});
@@ -183,7 +182,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-			const result = await apiClient.listPages(10, 5);
+			const result = await apiClient.listPages('test-project', 10, 5);
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -214,7 +213,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-			const result = await apiClient.searchPages('test', 'title');
+			const result = await apiClient.searchPages('test-project', 'test', 'title');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -235,7 +234,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-			const result = await apiClient.searchPages('query', 'fulltext', 100);
+			const result = await apiClient.searchPages('test-project', 'query', 'fulltext', 100);
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -254,9 +253,9 @@ describe('CosenseApiClient', () => {
 			apiClient = new CosenseApiClient(
 				mockExecuteFunctions,
 				{
-					projectName: 'test-project',
 					authenticationType: 'serviceAccount',
 					serviceAccountKey: 'test-service-key',
+					projectName: 'test-project'
 				},
 				0
 			);
@@ -270,7 +269,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-			await apiClient.getPage('Test Page');
+			await apiClient.getPage('test-project', 'Test Page');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -283,14 +282,14 @@ describe('CosenseApiClient', () => {
 		});
 
 		it('should throw error when trying to create page with service account', async () => {
-			await expect(apiClient.createPage({
+			await expect(apiClient.createPage('test-project', {
 				title: 'New Page',
 				lines: ['Content'],
 			})).rejects.toThrow('Service Account authentication does not support write operations');
 		});
 
 		it('should throw error when trying to insert lines with service account', async () => {
-			await expect(apiClient.insertLines('Test Page', {
+			await expect(apiClient.insertLines('test-project', 'Test Page', {
 				lineNumber: 0,
 				text: 'New line',
 			})).rejects.toThrow('Service Account authentication does not support write operations');
@@ -375,7 +374,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-			const result = await apiClient.getProjectInfo();
+			const result = await apiClient.getProjectInfo('test-project');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -416,7 +415,7 @@ describe('CosenseApiClient', () => {
 			
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockCsvData);
 
-			const result = await apiClient.getTable('Page With Table', 'table1');
+			const result = await apiClient.getTable('test-project', 'Page With Table', 'table1');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -441,7 +440,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-			const result = await apiClient.getTable('Page', 'table2');
+			const result = await apiClient.getTable('test-project', 'Page', 'table2');
 
 			expect(result).toEqual(mockResponse);
 		});
@@ -451,7 +450,7 @@ describe('CosenseApiClient', () => {
 			(error as any).response = { statusCode: 404 };
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
 
-			await expect(apiClient.getTable('Page', 'nonexistent'))
+			await expect(apiClient.getTable('test-project', 'Page', 'nonexistent'))
 				.rejects.toThrow('Table "nonexistent" not found in page "Page"');
 		});
 	});
@@ -466,7 +465,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockPage);
 
-			const result = await apiClient.getPageIdByTitle('Test Page');
+			const result = await apiClient.getPageIdByTitle('test-project', 'Test Page');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -487,7 +486,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockPage);
 
-			await expect(apiClient.getPageIdByTitle('Test Page'))
+			await expect(apiClient.getPageIdByTitle('test-project', 'Test Page'))
 				.rejects.toThrow('Page ID not found for page "Test Page"');
 		});
 	});
@@ -511,7 +510,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockSnapshots);
 
-			const result = await apiClient.getPageSnapshots('page123');
+			const result = await apiClient.getPageSnapshots('test-project', 'page123');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -529,7 +528,7 @@ describe('CosenseApiClient', () => {
 			(error as any).response = { statusCode: 404 };
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
 
-			await expect(apiClient.getPageSnapshots('nonexistent'))
+			await expect(apiClient.getPageSnapshots('test-project', 'nonexistent'))
 				.rejects.toThrow('Page with ID "nonexistent" not found');
 		});
 	});
@@ -545,7 +544,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockSnapshot);
 
-			const result = await apiClient.getPageSnapshotByTimestamp('page123', 'timestamp123');
+			const result = await apiClient.getPageSnapshotByTimestamp('test-project', 'page123', 'timestamp123');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -563,7 +562,7 @@ describe('CosenseApiClient', () => {
 			(error as any).response = { statusCode: 404 };
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
 
-			await expect(apiClient.getPageSnapshotByTimestamp('page123', 'nonexistent'))
+			await expect(apiClient.getPageSnapshotByTimestamp('test-project', 'page123', 'nonexistent'))
 				.rejects.toThrow('Snapshot not found for page ID "page123" at timestamp "nonexistent"');
 		});
 	});
@@ -589,7 +588,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockCommits);
 
-			const result = await apiClient.getPageCommits('page123');
+			const result = await apiClient.getPageCommits('test-project', 'page123');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -607,7 +606,7 @@ describe('CosenseApiClient', () => {
 			(error as any).response = { statusCode: 404 };
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
 
-			await expect(apiClient.getPageCommits('nonexistent'))
+			await expect(apiClient.getPageCommits('test-project', 'nonexistent'))
 				.rejects.toThrow('Page with ID "nonexistent" not found');
 		});
 
@@ -615,7 +614,7 @@ describe('CosenseApiClient', () => {
 			const mockCommits = [{ id: 'commit1', pageId: 'page123' }];
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockCommits);
 
-			const result = await serviceAccountApiClient.getPageCommits('page123');
+			const result = await serviceAccountApiClient.getPageCommits('test-project', 'page123');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -648,7 +647,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockBackups);
 
-			const result = await apiClient.getProjectBackupList();
+			const result = await apiClient.getProjectBackupList('test-project');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -684,7 +683,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockBackup);
 
-			const result = await apiClient.getProjectBackup('backup1');
+			const result = await apiClient.getProjectBackup('test-project', 'backup1');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',

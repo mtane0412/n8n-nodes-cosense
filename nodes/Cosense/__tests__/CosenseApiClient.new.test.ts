@@ -21,7 +21,6 @@ describe('CosenseApiClient - New Features', () => {
 		apiClient = new CosenseApiClient(
 			mockExecuteFunctions as IExecuteFunctions,
 			{
-				projectName: 'test-project',
 				authenticationType: 'sessionCookie',
 				sessionId: 'test-session',
 			},
@@ -38,7 +37,7 @@ describe('CosenseApiClient - New Features', () => {
 				.mockResolvedValueOnce(page1)
 				.mockResolvedValueOnce(page2);
 
-			const result = await apiClient.listAllPages();
+			const result = await apiClient.listAllPages('test-project');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledTimes(2);
 			expect(result).toHaveLength(150);
@@ -64,7 +63,7 @@ describe('CosenseApiClient - New Features', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockPage);
 
-			const result = await apiClient.getCodeBlocks('Test Page');
+			const result = await apiClient.getCodeBlocks('test-project', 'Test Page');
 
 			expect(result).toHaveLength(2);
 			expect(result[0]).toEqual({
@@ -91,7 +90,7 @@ describe('CosenseApiClient - New Features', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockPages);
 
-			const result = await apiClient.exportPages();
+			const result = await apiClient.exportPages('test-project');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -114,7 +113,7 @@ describe('CosenseApiClient - New Features', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockTimestamps);
 
-			const result = await apiClient.getTimestampIds('Test Page');
+			const result = await apiClient.getTimestampIds('test-project', 'Test Page');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -138,7 +137,7 @@ describe('CosenseApiClient - New Features', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockSnapshot);
 
-			const result = await apiClient.getSnapshot('Test Page', '123456');
+			const result = await apiClient.getSnapshot('test-project', 'Test Page', '123456');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -175,7 +174,7 @@ describe('CosenseApiClient - New Features', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockNotifications);
 
-			const result = await apiClient.getProjectNotifications();
+			const result = await apiClient.getProjectNotifications('test-project');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -192,7 +191,6 @@ describe('CosenseApiClient - New Features', () => {
 			const serviceAccountClient = new CosenseApiClient(
 				mockExecuteFunctions as IExecuteFunctions,
 				{
-					projectName: 'test-project',
 					authenticationType: 'serviceAccount',
 					serviceAccountKey: 'test-key',
 				},
@@ -239,7 +237,7 @@ describe('CosenseApiClient - New Features', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockInvitations);
 
-			const result = await apiClient.getProjectInvitations();
+			const result = await apiClient.getProjectInvitations('test-project');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -265,7 +263,7 @@ describe('CosenseApiClient - New Features', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockDeletedPage);
 
-			const result = await apiClient.getDeletedPage('page123');
+			const result = await apiClient.getDeletedPage('test-project', 'page123');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -279,7 +277,7 @@ describe('CosenseApiClient - New Features', () => {
 		});
 
 		it('should handle 404 error for non-existent deleted page', async () => {
-			const error = new Error('Not Found');
+			const error: any = new Error('Not Found');
 			error.response = { statusCode: 404 };
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
 
@@ -311,7 +309,7 @@ describe('CosenseApiClient - New Features', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockFeed);
 
-			const result = await apiClient.getProjectFeed();
+			const result = await apiClient.getProjectFeed('test-project');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
