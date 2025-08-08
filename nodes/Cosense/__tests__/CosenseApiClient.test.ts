@@ -240,4 +240,52 @@ describe('CosenseApiClient', () => {
 			expect(result).toEqual(mockResponse);
 		});
 	});
+
+	describe('Service Account authentication', () => {
+		beforeEach(() => {
+			apiClient = new CosenseApiClient(
+				mockExecuteFunctions,
+				{
+					projectName: 'test-project',
+					authenticationType: 'serviceAccount',
+					serviceAccountKey: 'test-service-key',
+				},
+				0
+			);
+		});
+
+		it('should use service account header for GET requests', async () => {
+			const mockResponse = {
+				title: 'Test Page',
+				lines: ['Line 1', 'Line 2'],
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			await apiClient.getPage('Test Page');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/pages/test-project/Test%20Page',
+				json: true,
+				headers: {
+					'x-service-account-access-key': 'test-service-key',
+				},
+			});
+		});
+
+		it('should throw error when trying to create page with service account', async () => {
+			await expect(apiClient.createPage({
+				title: 'New Page',
+				lines: ['Content'],
+			})).rejects.toThrow('Service Account authentication does not support write operations');
+		});
+
+		it('should throw error when trying to insert lines with service account', async () => {
+			await expect(apiClient.insertLines('Test Page', {
+				lineNumber: 0,
+				text: 'New line',
+			})).rejects.toThrow('Service Account authentication does not support write operations');
+		});
+	});
 });

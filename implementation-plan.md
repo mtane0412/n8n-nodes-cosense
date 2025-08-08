@@ -60,10 +60,25 @@ Cosense MCP Serverの機能をn8nノードとして実装する計画書です�
 
 ### 認証
 
-- **認証方式**: Cookieベースのセッション認証
+Cosenseは2つの認証方式をサポート：
+
+#### 1. Cookieベースのセッション認証
 - **必要な情報**: 
-  - `COSENSE_SID`: セッションID（プライベートページの読み取り、ページへの書き込みに必要）
+  - `COSENSE_SID`: セッションID（connect.sid）
 - **実装方法**: HTTPリクエストのCookieヘッダーに`connect.sid={COSENSE_SID}`を設定
+- **用途**: すべてのAPI操作（読み取り・書き込み）
+- **取得方法**: ブラウザでCosenseにログイン後、開発者ツールでCookieを確認
+
+#### 2. Service Account認証（Business Planのみ）
+- **必要な情報**:
+  - `SERVICE_ACCOUNT_KEY`: Service Account Access Key
+- **実装方法**: HTTPリクエストのヘッダーに`x-service-account-access-key: {SERVICE_ACCOUNT_KEY}`を設定
+- **用途**: Private Projectのデータ読み取り専用
+- **制限事項**:
+  - 同一Project内のAPIのみアクセス可能
+  - 読み取り専用（書き込み不可）
+  - Business Planでのみ利用可能
+- **取得方法**: Project設定画面のService Accountsタブから発行
 
 ## ファイル構成
 
@@ -174,5 +189,15 @@ n8n-nodes-cosense/
   - Cosenseノードのテストを更新
   - 認証エラー、404エラー、409エラーの適切なハンドリング
   - 全テストが成功（21テスト）
+  - ESLintチェックをパス
+  - TypeScriptビルドが成功
+
+- **Service Account認証のサポート追加**
+  - 認証方式の選択オプションを追加（Session Cookie / Service Account）
+  - CosenseApiCredentials.credentials.tsにService Account Access Keyフィールドを追加
+  - CosenseApiClientでService Account認証ヘッダー（x-service-account-access-key）をサポート
+  - Service Account使用時の書き込み操作制限を実装
+  - Service Account認証のユニットテストを追加（3テスト）
+  - 全テストが成功（24テスト）
   - ESLintチェックをパス
   - TypeScriptビルドが成功

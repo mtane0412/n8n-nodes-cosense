@@ -6,7 +6,9 @@ import { NodeApiError } from 'n8n-workflow';
 
 export interface CosenseCredentials {
 	projectName: string;
+	authenticationType?: 'sessionCookie' | 'serviceAccount';
 	sessionId?: string;
+	serviceAccountKey?: string;
 }
 
 export interface PageData {
@@ -32,12 +34,16 @@ export interface InsertLinesData {
 export class CosenseApiClient {
 	private baseUrl = 'https://scrapbox.io/api';
 	private projectName: string;
+	private authenticationType?: 'sessionCookie' | 'serviceAccount';
 	private sessionId?: string;
+	private serviceAccountKey?: string;
 	private executeFunctions: IExecuteFunctions;
 	constructor(executeFunctions: IExecuteFunctions, credentials: CosenseCredentials, itemIndex: number) {
 		this.executeFunctions = executeFunctions;
 		this.projectName = credentials.projectName;
+		this.authenticationType = credentials.authenticationType;
 		this.sessionId = credentials.sessionId;
+		this.serviceAccountKey = credentials.serviceAccountKey;
 		// itemIndexは現在使用していないが、将来の拡張を考慮して引数のみ保持
 	}
 
@@ -48,7 +54,11 @@ export class CosenseApiClient {
 			json: true,
 		};
 
-		if (this.sessionId) {
+		if (this.authenticationType === 'serviceAccount' && this.serviceAccountKey) {
+			options.headers = {
+				'x-service-account-access-key': this.serviceAccountKey,
+			};
+		} else if (this.sessionId) {
 			options.headers = {
 				Cookie: `connect.sid=${this.sessionId}`,
 			};
@@ -119,6 +129,11 @@ export class CosenseApiClient {
 	}
 
 	async createPage(data: CreatePageData): Promise<PageData> {
+		if (this.authenticationType === 'serviceAccount') {
+			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
+				message: 'Service Account authentication does not support write operations. Please use Session Cookie authentication.',
+			});
+		}
 		if (!this.sessionId) {
 			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
 				message: 'Session ID is required for creating pages. Please add your credentials.',
@@ -150,6 +165,11 @@ export class CosenseApiClient {
 	}
 
 	async insertLines(pageTitle: string, data: InsertLinesData): Promise<PageData> {
+		if (this.authenticationType === 'serviceAccount') {
+			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
+				message: 'Service Account authentication does not support write operations. Please use Session Cookie authentication.',
+			});
+		}
 		if (!this.sessionId) {
 			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
 				message: 'Session ID is required for editing pages. Please add your credentials.',
