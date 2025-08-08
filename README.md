@@ -1,47 +1,179 @@
-![Banner image](https://user-images.githubusercontent.com/10284570/173569848-c624317f-42b1-45a6-ab09-f0ea3c247648.png)
+# n8n-nodes-cosense
 
-# n8n-nodes-starter
+This is an n8n community node. It lets you integrate [Cosense](https://cosense.growi.cloud/) (formerly Scrapbox) into your n8n workflows.
 
-This repo contains example nodes to help you get started building your own custom integrations for [n8n](https://n8n.io). It includes the node linter and other dependencies.
+Cosense is a collaborative documentation platform that allows teams to create, share, and organize knowledge using a unique wiki-style interface with real-time collaboration features.
 
-To make your custom node available to the community, you must create it as an npm package, and [submit it to the npm registry](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry).
+[n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/reference/license/) workflow automation platform.
 
-If you would like your node to be available on n8n cloud you can also [submit your node for verification](https://docs.n8n.io/integrations/creating-nodes/deploy/submit-community-nodes/).
+## Installation
 
-## Prerequisites
+Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
 
-You need the following installed on your development machine:
+### npm
 
-* [git](https://git-scm.com/downloads)
-* Node.js and npm. Minimum version Node 20. You can find instructions on how to install both using nvm (Node Version Manager) for Linux, Mac, and WSL [here](https://github.com/nvm-sh/nvm). For Windows users, refer to Microsoft's guide to [Install NodeJS on Windows](https://docs.microsoft.com/en-us/windows/dev-environment/javascript/nodejs-on-windows).
-* Install n8n with:
-  ```
-  npm install n8n -g
-  ```
-* Recommended: follow n8n's guide to [set up your development environment](https://docs.n8n.io/integrations/creating-nodes/build/node-development-environment/).
+```bash
+npm install n8n-nodes-cosense
+```
 
-## Using this starter
+### n8n UI
 
-These are the basic steps for working with the starter. For detailed guidance on creating and publishing nodes, refer to the [documentation](https://docs.n8n.io/integrations/creating-nodes/).
+1. Open your n8n instance
+2. Go to **Settings** > **Community Nodes**
+3. Select **Install**
+4. Enter `n8n-nodes-cosense` in the npm Package Name field
+5. Agree to the risks of using community nodes
+6. Select **Install**
 
-1. [Generate a new repository](https://github.com/n8n-io/n8n-nodes-starter/generate) from this template repository.
-2. Clone your new repo:
-   ```
-   git clone https://github.com/<your organization>/<your-repo-name>.git
-   ```
-3. Run `npm i` to install dependencies.
-4. Open the project in your editor.
-5. Browse the examples in `/nodes` and `/credentials`. Modify the examples, or replace them with your own nodes.
-6. Update the `package.json` to match your details.
-7. Run `npm run lint` to check for errors or `npm run lintfix` to automatically fix errors when possible.
-8. Test your node locally. Refer to [Run your node locally](https://docs.n8n.io/integrations/creating-nodes/test/run-node-locally/) for guidance.
-9. Replace this README with documentation for your node. Use the [README_TEMPLATE](README_TEMPLATE.md) to get started.
-10. Update the LICENSE file to use your details.
-11. [Publish](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry) your package to npm.
+## Authentication
 
-## More information
+This node supports two authentication methods:
 
-Refer to our [documentation on creating nodes](https://docs.n8n.io/integrations/creating-nodes/) for detailed information on building your own nodes.
+### 1. Session Cookie Authentication (Default)
+
+- Works for all operations (read and write)
+- Requires a session ID from Cosense
+
+**How to get your Session ID:**
+1. Log in to your Cosense account in a web browser
+2. Open Developer Tools (F12)
+3. Go to the Application/Storage tab
+4. Find Cookies for `scrapbox.io`
+5. Copy the value of `connect.sid`
+
+### 2. Service Account Authentication (Business Plan Only)
+
+- Read-only access to Private Projects
+- Available only for Business Plan users
+- Limited to same-project API access
+
+**How to get your Service Account Key:**
+1. Go to your Project Settings
+2. Navigate to the Service Accounts tab
+3. Generate a new Service Account Access Key
+
+## Operations
+
+This node supports the following operations:
+
+### Get Page
+Retrieve a specific page by title.
+
+**Parameters:**
+- Project Name (required)
+- Page Title (required)
+
+### List Pages
+Get a list of pages in a project.
+
+**Parameters:**
+- Project Name (required)
+- Limit (optional, default: 100)
+- Skip (optional, default: 0)
+
+### Search Pages
+Search for pages using keywords.
+
+**Parameters:**
+- Project Name (required)
+- Search Query (required)
+- Search Type: Title Search or Full-text Search
+- Limit (optional, default: 50)
+
+### Create Page
+Create a new page in a project.
+
+**Parameters:**
+- Project Name (required)
+- Page Title (required)
+- Content (required)
+
+**Note:** Requires Session Cookie authentication.
+
+### Insert Lines
+Insert text at a specific line in an existing page.
+
+**Parameters:**
+- Project Name (required)
+- Page Title (required)
+- Line Number (required)
+- Text to Insert (required)
+
+**Note:** Requires Session Cookie authentication.
+
+## Example Usage
+
+### Basic Page Retrieval
+
+1. Add a Cosense node to your workflow
+2. Select "Get Page" as the operation
+3. Enter your project name and page title
+4. Execute the node
+
+### Batch Processing Pages
+
+1. Use List Pages to get all pages
+2. Connect to a Loop node
+3. Process each page individually
+4. Use Insert Lines to update pages with results
+
+### Search and Update Workflow
+
+1. Search Pages with specific keywords
+2. Filter results based on criteria
+3. Update matching pages with new content
+
+## Error Handling
+
+The node includes comprehensive error handling:
+
+- **Authentication errors (401)**: Check your credentials
+- **Not found errors (404)**: Verify project name and page title
+- **Conflict errors (409)**: Page already exists (for Create Page)
+- **Rate limiting (429)**: Automatic retry with exponential backoff
+  - Maximum 3 retries
+  - Delays: 1s, 2s, 4s (up to 60s max)
+  - Transparent to workflow execution
+
+Enable "Continue On Fail" in node settings to handle errors gracefully in your workflows.
+
+## Resources
+
+* [n8n community nodes documentation](https://docs.n8n.io/integrations/community-nodes/)
+* [Cosense (Scrapbox) Documentation](https://scrapbox.io/help/)
+* [Cosense API Reference](https://scrapbox.io/scrapboxlab/Scrapbox_REST_API%E3%81%AE%E4%B8%80%E8%A6%A7)
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Build the node
+npm run build
+
+# Run tests
+npm test
+
+# Run integration tests (requires .env configuration)
+npm run test:integration
+
+# Lint the code
+npm run lint
+```
+
+### Integration Tests
+
+To run integration tests against the actual Cosense API:
+
+1. Copy `.env.example` to `.env`
+2. Fill in your Cosense credentials:
+   - `COSENSE_PROJECT_NAME`: Your project name
+   - `COSENSE_SID`: Your session ID (for full access)
+   - `COSENSE_SERVICE_ACCOUNT_KEY`: Your service account key (optional, read-only)
+3. Run `npm run test:integration`
+
+**Note:** Integration tests will create test pages in your specified project. Make sure to use a test project.
 
 ## License
 

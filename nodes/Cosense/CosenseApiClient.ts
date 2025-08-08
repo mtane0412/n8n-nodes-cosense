@@ -38,6 +38,11 @@ export class CosenseApiClient {
 	private sessionId?: string;
 	private serviceAccountKey?: string;
 	private executeFunctions: IExecuteFunctions;
+	
+	// レート制限設定
+	private static readonly MAX_RETRIES = 3;
+	private static readonly INITIAL_RETRY_DELAY = 1000; // 1秒
+	private static readonly MAX_RETRY_DELAY = 60000; // 60秒
 	constructor(executeFunctions: IExecuteFunctions, credentials: CosenseCredentials, itemIndex: number) {
 		this.executeFunctions = executeFunctions;
 		this.projectName = credentials.projectName;
@@ -67,43 +72,92 @@ export class CosenseApiClient {
 		return options;
 	}
 
+	private async delay(ms: number): Promise<void> {
+		return new Promise(resolve => setTimeout(resolve, ms));
+	}
+
+	private async executeWithRetry<T>(
+		operation: () => Promise<T>,
+		operationName: string,
+	): Promise<T> {
+		let lastError: any;
+		
+		for (let attempt = 0; attempt <= CosenseApiClient.MAX_RETRIES; attempt++) {
+			try {
+				return await operation();
+			} catch (error: any) {
+				lastError = error;
+				
+				// レート制限エラー（429）の場合のみリトライ
+				if (error.response?.statusCode === 429 && attempt < CosenseApiClient.MAX_RETRIES) {
+					// エクスポネンシャルバックオフ: 1s, 2s, 4s...
+					const delay = Math.min(
+						CosenseApiClient.INITIAL_RETRY_DELAY * Math.pow(2, attempt),
+						CosenseApiClient.MAX_RETRY_DELAY
+					);
+					
+					console.log(`Rate limited. Retrying ${operationName} after ${delay}ms (attempt ${attempt + 1}/${CosenseApiClient.MAX_RETRIES})...`);
+					await this.delay(delay);
+					continue;
+				}
+				
+				// その他のエラーまたは最大リトライ回数に達した場合は即座にスロー
+				throw error;
+			}
+		}
+		
+		// ここには到達しないはずだが、TypeScriptのために
+		throw lastError;
+	}
+
 	async getPage(pageTitle: string): Promise<PageData> {
 		const options = this.getRequestOptions();
 		options.url = `${this.baseUrl}/pages/${this.projectName}/${encodeURIComponent(pageTitle)}`;
 
-		try {
-			const response = await this.executeFunctions.helpers.httpRequest(options);
-			return response as PageData;
-		} catch (error: any) {
-			if (error.response?.statusCode === 404) {
-				throw new NodeApiError(this.executeFunctions.getNode(), error, {
-					message: `Page "${pageTitle}" not found in project "${this.projectName}"`,
-				});
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as PageData;
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Page "${pageTitle}" not found in project "${this.projectName}". Please check if the page title is correct and the page exists.`,
+						description: 'The requested page could not be found. This might happen if the page was deleted or the title is misspelled.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw error;
 			}
-			if (error.response?.statusCode === 401) {
-				throw new NodeApiError(this.executeFunctions.getNode(), error, {
-					message: 'Authentication failed. Please check your session ID.',
-				});
-			}
-			throw error;
-		}
+		}, `getPage(${pageTitle})`);
 	}
 
 	async listPages(limit: number, skip: number): Promise<JsonObject[]> {
 		const options = this.getRequestOptions();
 		options.url = `${this.baseUrl}/pages/${this.projectName}?limit=${limit}&skip=${skip}`;
 
-		try {
-			const response = await this.executeFunctions.helpers.httpRequest(options);
-			return response as JsonObject[];
-		} catch (error: any) {
-			if (error.response?.statusCode === 401) {
-				throw new NodeApiError(this.executeFunctions.getNode(), error, {
-					message: 'Authentication failed. Please check your session ID.',
-				});
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject[];
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw error;
 			}
-			throw error;
-		}
+		}, `listPages(limit=${limit}, skip=${skip})`);
 	}
 
 	async searchPages(query: string, searchType: 'title' | 'fulltext', limit?: number): Promise<JsonObject[]> {
@@ -115,28 +169,35 @@ export class CosenseApiClient {
 			options.url = `${this.baseUrl}/pages/${this.projectName}/search/query?q=${encodeURIComponent(query)}&limit=${limit || 50}`;
 		}
 
-		try {
-			const response = await this.executeFunctions.helpers.httpRequest(options);
-			return response as JsonObject[];
-		} catch (error: any) {
-			if (error.response?.statusCode === 401) {
-				throw new NodeApiError(this.executeFunctions.getNode(), error, {
-					message: 'Authentication failed. Please check your session ID.',
-				});
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject[];
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw error;
 			}
-			throw error;
-		}
+		}, `searchPages(${query}, ${searchType})`);
 	}
 
 	async createPage(data: CreatePageData): Promise<PageData> {
 		if (this.authenticationType === 'serviceAccount') {
 			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
-				message: 'Service Account authentication does not support write operations. Please use Session Cookie authentication.',
+				message: 'Service Account authentication does not support write operations',
+				description: 'Service Accounts are limited to read-only access. To create pages, please switch to Session Cookie authentication in the node credentials.',
 			});
 		}
 		if (!this.sessionId) {
 			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
-				message: 'Session ID is required for creating pages. Please add your credentials.',
+				message: 'Session ID is required for creating pages',
+				description: 'Please configure your Cosense credentials with a valid session ID. You can get this from your browser cookies after logging into Cosense.',
 			});
 		}
 
@@ -146,33 +207,41 @@ export class CosenseApiClient {
 			lines: data.lines,
 		};
 
-		try {
-			const response = await this.executeFunctions.helpers.httpRequest(options);
-			return response as PageData;
-		} catch (error: any) {
-			if (error.response?.statusCode === 401) {
-				throw new NodeApiError(this.executeFunctions.getNode(), error, {
-					message: 'Authentication failed. Please check your session ID.',
-				});
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as PageData;
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				if (error.response?.statusCode === 409) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Page "${data.title}" already exists in project "${this.projectName}"`,
+						description: 'A page with this title already exists. Please choose a different title or use the "Insert Lines" operation to update the existing page.',
+					});
+				}
+				throw error;
 			}
-			if (error.response?.statusCode === 409) {
-				throw new NodeApiError(this.executeFunctions.getNode(), error, {
-					message: `Page "${data.title}" already exists in project "${this.projectName}"`,
-				});
-			}
-			throw error;
-		}
+		}, `createPage(${data.title})`);
 	}
 
 	async insertLines(pageTitle: string, data: InsertLinesData): Promise<PageData> {
 		if (this.authenticationType === 'serviceAccount') {
 			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
-				message: 'Service Account authentication does not support write operations. Please use Session Cookie authentication.',
+				message: 'Service Account authentication does not support write operations',
+				description: 'Service Accounts are limited to read-only access. To edit pages, please switch to Session Cookie authentication in the node credentials.',
 			});
 		}
 		if (!this.sessionId) {
 			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
-				message: 'Session ID is required for editing pages. Please add your credentials.',
+				message: 'Session ID is required for editing pages',
+				description: 'Please configure your Cosense credentials with a valid session ID. You can get this from your browser cookies after logging into Cosense.',
 			});
 		}
 
@@ -192,16 +261,21 @@ export class CosenseApiClient {
 			lines: newLines,
 		};
 
-		try {
-			const response = await this.executeFunctions.helpers.httpRequest(options);
-			return response as PageData;
-		} catch (error: any) {
-			if (error.response?.statusCode === 401) {
-				throw new NodeApiError(this.executeFunctions.getNode(), error, {
-					message: 'Authentication failed. Please check your session ID.',
-				});
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as PageData;
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw error;
 			}
-			throw error;
-		}
+		}, `insertLines(${pageTitle})`);
 	}
 }
