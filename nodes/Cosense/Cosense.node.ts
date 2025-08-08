@@ -78,16 +78,10 @@ export class Cosense implements INodeType {
 				},
 				options: [
 					{
-						name: 'Create',
+						name: 'Create Page',
 						value: 'create',
 						description: 'Create a new page or append to existing page',
 						action: 'Create a page',
-					},
-					{
-						name: 'Get',
-						value: 'get',
-						description: 'Get a page by title',
-						action: 'Get a page',
 					},
 					{
 						name: 'Get Code Blocks',
@@ -102,16 +96,33 @@ export class Cosense implements INodeType {
 						action: 'Get page commits',
 					},
 					{
-						name: 'Get Deleted',
+						name: 'Get Deleted Page',
 						value: 'getDeleted',
 						description: 'Get deleted page information',
 						action: 'Get deleted page',
 					},
 					{
-						name: 'Get Icon',
+						name: 'Get Page',
+						value: 'get',
+						description: 'Get a page by title',
+						action: 'Get a page',
+					},
+					{
+						name: 'Get Page Icon',
 						value: 'getIcon',
-						description: 'Get page icon',
 						action: 'Get page icon',
+					},
+					{
+						name: 'Get Pages',
+						value: 'list',
+						description: 'List pages in a project',
+						action: 'List pages',
+					},
+					{
+						name: 'Get Plaintext',
+						value: 'getText',
+						description: 'Get page content as plain text',
+						action: 'Get page text',
 					},
 					{
 						name: 'Get Snapshot',
@@ -132,22 +143,10 @@ export class Cosense implements INodeType {
 						action: 'Get table data',
 					},
 					{
-						name: 'Get Text',
-						value: 'getText',
-						description: 'Get page content as plain text',
-						action: 'Get page text',
-					},
-					{
 						name: 'Insert Lines',
 						value: 'insertLines',
 						description: 'Insert text into an existing page',
 						action: 'Insert lines into a page',
-					},
-					{
-						name: 'List',
-						value: 'list',
-						description: 'List pages in a project',
-						action: 'List pages',
 					},
 					{
 						name: 'Search by Full Text',
