@@ -9,12 +9,18 @@
 - ✅ GET `/api/pages/:projectname/:pagetitle/text` - ページテキスト取得（getPageで統合）
 - ✅ GET `/api/pages/:projectname/search/titles` - タイトル検索
 - ✅ GET `/api/code/:projectname/:pagetitle/:filename` - コードブロック取得（getCodeBlocksとして実装）
+- ✅ GET `/api/table/:projectname/:pagetitle/:filename.csv` - テーブルデータのCSV形式での取得（2025-08-08実装）
 
 #### 検索API
 - ✅ GET `/api/pages/:projectname/search/query` - フルテキスト検索
 
 #### プロジェクト情報API
 - ✅ GET `/api/pages/:projectname` - プロジェクト内のページ一覧
+- ✅ GET `/api/projects/:projectname` - プロジェクト詳細情報の取得（2025-08-08実装）
+
+#### ユーザー情報API
+- ✅ GET `/api/users/me` - 現在のユーザー情報取得（2025-08-08実装）
+- ✅ GET `/api/projects` - ユーザーが参加しているプロジェクト一覧（2025-08-08実装）
 
 #### データエクスポート/インポート
 - ✅ GET `/api/page-data/export/:projectname.json` - プロジェクトデータエクスポート（exportPagesとして実装）
@@ -30,9 +36,6 @@
    - ページアイコンの取得
    - 実装優先度: 中
 
-2. **GET `/api/table/:projectname/:pagetitle/:filename.csv`**
-   - テーブルデータのCSV形式での取得
-   - 実装優先度: 高
 
 3. **GET `/api/page-snapshots/:projectname/:pageid`**
    - ページスナップショット一覧の取得
@@ -62,44 +65,32 @@
    - 実装優先度: 低
 
 ### プロジェクト情報API
-1. **GET `/api/projects/:projectname`**
-   - プロジェクト詳細情報の取得
-   - 実装優先度: 高
-
-2. **GET `/api/stream/:projectname/`**
+1. **GET `/api/stream/:projectname/`**
    - プロジェクトストリーム（更新情報）の取得
    - 実装優先度: 中
 
-3. **GET `/api/feed/:projectname`**
+2. **GET `/api/feed/:projectname`**
    - プロジェクトフィードの取得
    - 実装優先度: 低
 
-4. **GET `/api/projects/:projectname/notifications`**
+3. **GET `/api/projects/:projectname/notifications`**
    - 通知情報の取得
    - 実装優先度: 低
 
-5. **GET `/api/projects/:projectname/invitations`**
+4. **GET `/api/projects/:projectname/invitations`**
    - 招待情報の取得
    - 実装優先度: 低
 
-6. **GET `/api/project-backup/:projectname/list`**
+5. **GET `/api/project-backup/:projectname/list`**
    - バックアップ一覧の取得
    - 実装優先度: 中
 
-7. **GET `/api/project-backup/:projectname/:backupId.json`**
+6. **GET `/api/project-backup/:projectname/:backupId.json`**
    - 特定バックアップの取得
    - 実装優先度: 中
 
 ### ユーザー情報API
-1. **GET `/api/users/me`**
-   - 現在のユーザー情報取得
-   - 実装優先度: 高
-
-2. **GET `/api/projects`**
-   - ユーザーが参加しているプロジェクト一覧
-   - 実装優先度: 高
-
-3. **GET `/api/gcs/:projectname/usage`**
+1. **GET `/api/gcs/:projectname/usage`**
    - プロジェクトのストレージ使用状況
    - 実装優先度: 低
 
@@ -118,14 +109,22 @@
 
 ## 実装計画
 
-### フェーズ1: 高優先度API（1週目）
+### フェーズ1: 高優先度API（1週目）✅ 完了（2025-08-08）
 1. **ユーザー・プロジェクト情報API**
-   - GET `/api/users/me`
-   - GET `/api/projects`
-   - GET `/api/projects/:projectname`
+   - ✅ GET `/api/users/me` - getUserInfo()として実装
+   - ✅ GET `/api/projects` - getProjects()として実装  
+   - ✅ GET `/api/projects/:projectname` - getProjectInfo()として実装
 
 2. **テーブルデータAPI**
-   - GET `/api/table/:projectname/:pagetitle/:filename.csv`
+   - ✅ GET `/api/table/:projectname/:pagetitle/:filename.csv` - getTable()として実装
+
+3. **実装内容**
+   - CosenseApiClient.tsに4つの新しいAPIメソッドを追加
+   - Cosense.node.tsに新しいUserリソースを追加（Get Me, Get Projects操作）
+   - ProjectリソースにGet Info操作を追加
+   - PageリソースにGet Table操作を追加
+   - すべての新機能のユニットテストを作成
+   - Lintチェックとビルドの成功を確認
 
 ### フェーズ2: 中優先度API（2週目）
 1. **履歴・スナップショットAPI**

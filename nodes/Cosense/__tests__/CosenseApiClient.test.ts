@@ -12,6 +12,7 @@ describe('CosenseApiClient', () => {
 	let mockExecuteFunctions: any;
 	let mockNode: INode;
 	let apiClient: CosenseApiClient;
+	let serviceAccountApiClient: CosenseApiClient;
 
 	beforeEach(() => {
 		mockNode = {
@@ -33,6 +34,16 @@ describe('CosenseApiClient', () => {
 		apiClient = new CosenseApiClient(
 			mockExecuteFunctions,
 			{ projectName: 'test-project', sessionId: 'test-session' },
+			0
+		);
+
+		serviceAccountApiClient = new CosenseApiClient(
+			mockExecuteFunctions,
+			{ 
+				projectName: 'test-project', 
+				authenticationType: 'serviceAccount',
+				serviceAccountKey: 'test-service-account-key'
+			},
 			0
 		);
 	});
@@ -189,8 +200,16 @@ describe('CosenseApiClient', () => {
 	describe('searchPages', () => {
 		it('should search by title', async () => {
 			const mockResponse = [
-				{ title: 'Match 1' },
-				{ title: 'Match 2' },
+				{ title: 'Test Match 1' },
+				{ title: 'Test Match 2' },
+				{ title: 'Other Page' },
+				{ title: 'Another test page' },
+			];
+
+			const expectedFiltered = [
+				{ title: 'Test Match 1' },
+				{ title: 'Test Match 2' },
+				{ title: 'Another test page' },
 			];
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
@@ -205,7 +224,7 @@ describe('CosenseApiClient', () => {
 					Cookie: 'connect.sid=test-session',
 				},
 			});
-			expect(result).toEqual(mockResponse);
+			expect(result).toEqual(expectedFiltered);
 		});
 
 		it('should search full text', async () => {
@@ -275,6 +294,165 @@ describe('CosenseApiClient', () => {
 				lineNumber: 0,
 				text: 'New line',
 			})).rejects.toThrow('Service Account authentication does not support write operations');
+		});
+	});
+
+	describe('getUserInfo', () => {
+		it('should get user info successfully', async () => {
+			const mockResponse = {
+				id: 'user123',
+				name: 'Test User',
+				displayName: 'Test User',
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await apiClient.getUserInfo();
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/users/me',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+
+		it('should use service account authentication', async () => {
+			const mockResponse = {
+				id: 'user123',
+				name: 'Service Account',
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await serviceAccountApiClient.getUserInfo();
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/users/me',
+				json: true,
+				headers: {
+					'x-service-account-access-key': 'test-service-account-key',
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+	});
+
+	describe('getProjects', () => {
+		it('should get projects list successfully', async () => {
+			const mockResponse = [
+				{ name: 'project1', displayName: 'Project 1' },
+				{ name: 'project2', displayName: 'Project 2' },
+			];
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await apiClient.getProjects();
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/projects',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+	});
+
+	describe('getProjectInfo', () => {
+		it('should get project info successfully', async () => {
+			const mockResponse = {
+				name: 'test-project',
+				displayName: 'Test Project',
+				created: 1234567890,
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await apiClient.getProjectInfo();
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/projects/test-project',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+
+		it('should get project info for specified project', async () => {
+			const mockResponse = {
+				name: 'other-project',
+				displayName: 'Other Project',
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await apiClient.getProjectInfo('other-project');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/projects/other-project',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+	});
+
+	describe('getTable', () => {
+		it('should get table data as CSV', async () => {
+			const mockCsvData = 'col1,col2,col3\nval1,val2,val3';
+			
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockCsvData);
+
+			const result = await apiClient.getTable('Page With Table', 'table1');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/table/test-project/Page%20With%20Table/table1.csv',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual({
+				csv: mockCsvData,
+				filename: 'table1.csv',
+				pageTitle: 'Page With Table',
+			});
+		});
+
+		it('should handle JSON response from table API', async () => {
+			const mockResponse = {
+				csv: 'col1,col2\nval1,val2',
+				metadata: 'some data',
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await apiClient.getTable('Page', 'table2');
+
+			expect(result).toEqual(mockResponse);
+		});
+
+		it('should handle 404 error for non-existent table', async () => {
+			const error = new Error('Not Found');
+			(error as any).response = { statusCode: 404 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getTable('Page', 'nonexistent'))
+				.rejects.toThrow('Table "nonexistent" not found in page "Page"');
 		});
 	});
 });

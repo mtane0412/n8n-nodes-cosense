@@ -18,7 +18,7 @@ export class Cosense implements INodeType {
 		icon: 'file:cosense.svg',
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{($parameter["resource"] === "page" ? $parameter["operation"] : $parameter["resource"] === "project" ? $parameter["projectOperation"] : $parameter["resource"] === "history" ? $parameter["historyOperation"] : $parameter["resource"] === "exportImport" ? $parameter["exportImportOperation"] : $parameter["externalOperation"]) + ": " + $parameter["resource"]}}',
+		subtitle: '={{($parameter["resource"] === "page" ? $parameter["operation"] : $parameter["resource"] === "project" ? $parameter["projectOperation"] : $parameter["resource"] === "history" ? $parameter["historyOperation"] : $parameter["resource"] === "exportImport" ? $parameter["exportImportOperation"] : $parameter["resource"] === "user" ? $parameter["userOperation"] : $parameter["externalOperation"]) + ": " + $parameter["resource"]}}',
 		description: 'Read and write pages in Cosense (formerly Scrapbox)',
 		defaults: {
 			name: 'Cosense',
@@ -63,6 +63,11 @@ export class Cosense implements INodeType {
 						value: 'project',
 						description: 'Work with entire projects',
 					},
+					{
+						name: 'User',
+						value: 'user',
+						description: 'Work with user and project information',
+					},
 				],
 				default: 'page',
 			},
@@ -96,6 +101,12 @@ export class Cosense implements INodeType {
 						action: 'Get code blocks from page',
 					},
 					{
+						name: 'Get Table',
+						value: 'getTable',
+						description: 'Get table data from a page as CSV',
+						action: 'Get table data',
+					},
+					{
 						name: 'Insert Lines',
 						value: 'insertLines',
 						description: 'Insert text into an existing page',
@@ -125,12 +136,28 @@ export class Cosense implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['page'],
-						operation: ['get', 'getCodeBlocks'],
+						operation: ['get', 'getCodeBlocks', 'getTable'],
 					},
 				},
 				default: '',
 				placeholder: 'My Page Title',
 				description: 'The title of the page to get',
+			},
+			// Get Table
+			{
+				displayName: 'Table Filename',
+				name: 'tableFilename',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['page'],
+						operation: ['getTable'],
+					},
+				},
+				default: '',
+				placeholder: 'table1',
+				description: 'The filename of the table (without .csv extension)',
 			},
 			// List Pages
 			{
@@ -325,6 +352,12 @@ export class Cosense implements INodeType {
 						action: 'Export pages from project',
 					},
 					{
+						name: 'Get Info',
+						value: 'getInfo',
+						description: 'Get project information',
+						action: 'Get project information',
+					},
+					{
 						name: 'Import Pages',
 						value: 'importPages',
 						description: 'Import pages into a project',
@@ -332,6 +365,33 @@ export class Cosense implements INodeType {
 					},
 				],
 				default: 'exportPages',
+			},
+			// User Operations
+			{
+				displayName: 'Operation',
+				name: 'userOperation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['user'],
+					},
+				},
+				options: [
+					{
+						name: 'Get Me',
+						value: 'getMe',
+						description: 'Get current user information',
+						action: 'Get current user information',
+					},
+					{
+						name: 'Get Projects',
+						value: 'getProjects',
+						description: 'Get list of projects the user has access to',
+						action: 'Get user projects',
+					},
+				],
+				default: 'getMe',
 			},
 			// History Operations
 			{
@@ -457,6 +517,21 @@ export class Cosense implements INodeType {
 				placeholder: '1234567890',
 				description: 'The timestamp ID of the snapshot to retrieve',
 			},
+			// Project - Get Info Parameters
+			{
+				displayName: 'Project Name',
+				name: 'projectNameParam',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['project'],
+						projectOperation: ['getInfo'],
+					},
+				},
+				default: '',
+				placeholder: 'project-name',
+				description: 'Name of the project to get info for. Leave empty to use the project from credentials.',
+			},
 			// Import Pages Parameters
 			{
 				displayName: 'Pages Data',
@@ -542,6 +617,10 @@ export class Cosense implements INodeType {
 					} else if (operation === 'getCodeBlocks') {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
 						responseData = await apiClient.getCodeBlocks(pageTitle);
+					} else if (operation === 'getTable') {
+						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
+						const tableFilename = this.getNodeParameter('tableFilename', i) as string;
+						responseData = await apiClient.getTable(pageTitle, tableFilename);
 					} else if (operation === 'list') {
 						const returnAll = this.getNodeParameter('returnAll', i) as boolean;
 						if (returnAll) {
@@ -574,10 +653,20 @@ export class Cosense implements INodeType {
 					const operation = this.getNodeParameter('projectOperation', i) as string;
 					if (operation === 'exportPages') {
 						responseData = await apiClient.exportPages();
+					} else if (operation === 'getInfo') {
+						const projectName = this.getNodeParameter('projectNameParam', i) as string;
+						responseData = await apiClient.getProjectInfo(projectName || undefined);
 					} else if (operation === 'importPages') {
 						const pagesData = this.getNodeParameter('pagesData', i) as string;
 						const pages = JSON.parse(pagesData) as JsonObject[];
 						responseData = await apiClient.importPages(pages);
+					}
+				} else if (resource === 'user') {
+					const operation = this.getNodeParameter('userOperation', i) as string;
+					if (operation === 'getMe') {
+						responseData = await apiClient.getUserInfo();
+					} else if (operation === 'getProjects') {
+						responseData = await apiClient.getProjects();
 					}
 				} else if (resource === 'history') {
 					const operation = this.getNodeParameter('historyOperation', i) as string;

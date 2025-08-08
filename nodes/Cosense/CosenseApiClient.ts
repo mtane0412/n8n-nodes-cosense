@@ -432,6 +432,45 @@ export class CosenseApiClient {
 	}
 
 	// Content Analysis Methods
+	async getTable(pageTitle: string, filename: string): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/table/${this.projectName}/${encodeURIComponent(pageTitle)}/${encodeURIComponent(filename)}.csv`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				// レスポンスがCSV文字列の場合、パースして返す
+				if (typeof response === 'string') {
+					return {
+						csv: response,
+						filename: `${filename}.csv`,
+						pageTitle,
+					};
+				}
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Table "${filename}" not found in page "${pageTitle}"`,
+						description: 'The requested table could not be found. Please verify the page title and table filename.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get table data',
+					description: error.message || 'An error occurred while fetching table data',
+				});
+			}
+		}, `getTable(${pageTitle}, ${filename})`);
+	}
+
 	async getCodeBlocks(pageTitle: string): Promise<JsonObject[]> {
 		const page = await this.getPage(pageTitle);
 		const codeBlocks: JsonObject[] = [];
@@ -583,5 +622,102 @@ export class CosenseApiClient {
 				});
 			}
 		}, `getWebPageTitle(${url})`);
+	}
+
+	// User and Project Information Methods
+	async getUserInfo(): Promise<JsonObject> {
+		if (!this.sessionId && this.authenticationType !== 'serviceAccount') {
+			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
+				message: 'Session ID is required for getting user information',
+				description: 'Please configure your Cosense credentials with a valid session ID.',
+			});
+		}
+
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/users/me`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get user information',
+					description: error.message || 'An error occurred while fetching user information',
+				});
+			}
+		}, 'getUserInfo');
+	}
+
+	async getProjects(): Promise<JsonObject[]> {
+		if (!this.sessionId && this.authenticationType !== 'serviceAccount') {
+			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
+				message: 'Session ID is required for getting project list',
+				description: 'Please configure your Cosense credentials with a valid session ID.',
+			});
+		}
+
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/projects`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject[];
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get project list',
+					description: error.message || 'An error occurred while fetching project list',
+				});
+			}
+		}, 'getProjects');
+	}
+
+	async getProjectInfo(projectName?: string): Promise<JsonObject> {
+		const targetProjectName = projectName || this.projectName;
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/projects/${targetProjectName}`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Project "${targetProjectName}" not found`,
+						description: 'The requested project could not be found. Please verify the project name.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get project information',
+					description: error.message || 'An error occurred while fetching project information',
+				});
+			}
+		}, `getProjectInfo(${targetProjectName})`);
 	}
 }
