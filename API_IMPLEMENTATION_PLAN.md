@@ -6,7 +6,7 @@
 
 #### ページ情報API
 - ✅ GET `/api/pages/:projectname/:pagetitle` - ページ取得
-- ✅ GET `/api/pages/:projectname/:pagetitle/text` - ページテキスト取得（getPageで統合）
+- ✅ GET `/api/pages/:projectname/:pagetitle/text` - ページテキスト取得（getPageTextとして実装 - 2025-08-08）
 - ✅ GET `/api/pages/:projectname/:pagetitle/icon` - ページアイコンの取得（2025-08-08実装）
 - ✅ GET `/api/pages/:projectname/search/titles` - タイトル検索
 - ✅ GET `/api/code/:projectname/:pagetitle/:filename` - コードブロック取得（getCodeBlocksとして実装）

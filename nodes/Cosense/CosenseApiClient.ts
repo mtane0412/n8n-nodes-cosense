@@ -164,6 +164,34 @@ export class CosenseApiClient {
 		}, `getPage(${pageTitle})`);
 	}
 
+	async getPageText(projectName: string, pageTitle: string): Promise<string> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/pages/${projectName}/${encodeURIComponent(pageTitle)}/text`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as string;
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Page "${pageTitle}" not found in project "${this.projectName}". Please check if the page title is correct and the page exists.`,
+						description: 'The requested page could not be found. This might happen if the page was deleted or the title is misspelled.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw error;
+			}
+		}, `getPageText(${pageTitle})`);
+	}
+
 	async listPages(projectName: string, limit: number, skip: number): Promise<JsonObject[]> {
 		const options = this.getRequestOptions();
 		options.url = `${this.baseUrl}/pages/${projectName}?limit=${limit}&skip=${skip}`;

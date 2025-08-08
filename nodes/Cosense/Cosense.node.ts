@@ -137,6 +137,12 @@ export class Cosense implements INodeType {
 						action: 'Get table data',
 					},
 					{
+						name: 'Get Text',
+						value: 'getText',
+						description: 'Get page content as plain text',
+						action: 'Get page text',
+					},
+					{
 						name: 'Insert Lines',
 						value: 'insertLines',
 						description: 'Insert text into an existing page',
@@ -181,7 +187,7 @@ export class Cosense implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['page'],
-						operation: ['get', 'getCodeBlocks', 'getTable', 'getSnapshots', 'getSnapshot', 'getCommits', 'getIcon'],
+						operation: ['get', 'getCodeBlocks', 'getTable', 'getText', 'getSnapshots', 'getSnapshot', 'getCommits', 'getIcon'],
 					},
 				},
 				default: '',
@@ -842,6 +848,10 @@ export class Cosense implements INodeType {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
 						const tableFilename = this.getNodeParameter('tableFilename', i) as string;
 						responseData = await apiClient.getTable(projectName, pageTitle, tableFilename);
+					} else if (operation === 'getText') {
+						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
+						const text = await apiClient.getPageText(projectName, pageTitle);
+						responseData = { text };
 					} else if (operation === 'list') {
 						const returnAll = this.getNodeParameter('returnAll', i) as boolean;
 						if (returnAll) {

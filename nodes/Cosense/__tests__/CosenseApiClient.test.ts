@@ -79,6 +79,42 @@ describe('CosenseApiClient', () => {
 		});
 	});
 
+	describe('getPageText', () => {
+		it('should get page text successfully', async () => {
+			const mockText = 'This is the page content\nLine 2\nLine 3';
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockText);
+
+			const result = await apiClient.getPageText('test-project', 'Test Page');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/pages/test-project/Test%20Page/text',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockText);
+		});
+
+		it('should throw NodeApiError for 404', async () => {
+			const error = new Error('Not found');
+			(error as any).response = { statusCode: 404 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getPageText('test-project', 'Non-existent')).rejects.toThrow(NodeApiError);
+		});
+
+		it('should throw NodeApiError for 401', async () => {
+			const error = new Error('Unauthorized');
+			(error as any).response = { statusCode: 401 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getPageText('test-project', 'Test Page')).rejects.toThrow(NodeApiError);
+		});
+	});
+
 	describe('createPage', () => {
 		it('should create a page successfully', async () => {
 			const mockPageResponse = {
