@@ -15,7 +15,7 @@ module.exports = {
     '^n8n-workflow$': '<rootDir>/node_modules/n8n-workflow',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@cosense))',
+    'node_modules/(?!(@cosense|@jsr))',
   ],
   extensionsToTreatAsEsm: ['.ts'],
   transform: {

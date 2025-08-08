@@ -18,7 +18,7 @@ export class Cosense implements INodeType {
 		icon: 'file:cosense.svg',
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
+		subtitle: '={{($parameter["resource"] === "page" ? $parameter["operation"] : $parameter["resource"] === "project" ? $parameter["projectOperation"] : $parameter["resource"] === "history" ? $parameter["historyOperation"] : $parameter["resource"] === "exportImport" ? $parameter["exportImportOperation"] : $parameter["externalOperation"]) + ": " + $parameter["resource"]}}',
 		description: 'Read and write pages in Cosense (formerly Scrapbox)',
 		defaults: {
 			name: 'Cosense',
@@ -39,8 +39,29 @@ export class Cosense implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
+						name: 'Export/Import',
+						value: 'exportImport',
+						description: 'Export or import project data',
+					},
+					{
+						name: 'External',
+						value: 'external',
+						description: 'External service integrations',
+					},
+					{
+						name: 'History',
+						value: 'history',
+						description: 'Access page version history',
+					},
+					{
 						name: 'Page',
 						value: 'page',
+						description: 'Work with individual pages',
+					},
+					{
+						name: 'Project',
+						value: 'project',
+						description: 'Work with entire projects',
 					},
 				],
 				default: 'page',
@@ -67,6 +88,12 @@ export class Cosense implements INodeType {
 						value: 'get',
 						description: 'Get a page by title',
 						action: 'Get a page',
+					},
+					{
+						name: 'Get Code Blocks',
+						value: 'getCodeBlocks',
+						description: 'Extract all code blocks from a page',
+						action: 'Get code blocks from page',
 					},
 					{
 						name: 'Insert Lines',
@@ -98,7 +125,7 @@ export class Cosense implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['page'],
-						operation: ['get'],
+						operation: ['get', 'getCodeBlocks'],
 					},
 				},
 				default: '',
@@ -107,6 +134,19 @@ export class Cosense implements INodeType {
 			},
 			// List Pages
 			{
+				displayName: 'Return All',
+				name: 'returnAll',
+				type: 'boolean',
+				displayOptions: {
+					show: {
+						resource: ['page'],
+						operation: ['list'],
+					},
+				},
+				default: false,
+				description: 'Whether to return all results or only up to a given limit',
+			},
+			{
 				displayName: 'Limit',
 				name: 'limit',
 				type: 'number',
@@ -114,6 +154,7 @@ export class Cosense implements INodeType {
 					show: {
 						resource: ['page'],
 						operation: ['list'],
+						returnAll: [false],
 					},
 				},
 				typeOptions: {
@@ -121,22 +162,6 @@ export class Cosense implements INodeType {
 				},
 				default: 50,
 				description: 'Max number of results to return',
-			},
-			{
-				displayName: 'Skip',
-				name: 'skip',
-				type: 'number',
-				displayOptions: {
-					show: {
-						resource: ['page'],
-						operation: ['list'],
-					},
-				},
-				typeOptions: {
-					minValue: 0,
-				},
-				default: 0,
-				description: 'Number of pages to skip',
 			},
 			// Create Page
 			{
@@ -281,15 +306,227 @@ export class Cosense implements INodeType {
 				default: 50,
 				description: 'Maximum number of search results to return',
 			},
+			// Project Operations
+			{
+				displayName: 'Operation',
+				name: 'projectOperation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['project'],
+					},
+				},
+				options: [
+					{
+						name: 'Export Pages',
+						value: 'exportPages',
+						description: 'Export all pages from a project',
+						action: 'Export pages from project',
+					},
+					{
+						name: 'Import Pages',
+						value: 'importPages',
+						description: 'Import pages into a project',
+						action: 'Import pages to project',
+					},
+				],
+				default: 'exportPages',
+			},
+			// History Operations
+			{
+				displayName: 'Operation',
+				name: 'historyOperation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['history'],
+					},
+				},
+				options: [
+					{
+						name: 'Get Snapshot',
+						value: 'getSnapshot',
+						description: 'Get a specific version of a page',
+						action: 'Get page snapshot',
+					},
+					{
+						name: 'Get Timestamp IDs',
+						value: 'getTimestampIds',
+						description: 'Get all timestamp IDs for a page',
+						action: 'Get page timestamp IDs',
+					},
+				],
+				default: 'getSnapshot',
+			},
+			// Export/Import Operations
+			{
+				displayName: 'Operation',
+				name: 'exportImportOperation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['exportImport'],
+					},
+				},
+				options: [
+					{
+						name: 'Export Project',
+						value: 'exportProject',
+						description: 'Export entire project data',
+						action: 'Export project data',
+					},
+					{
+						name: 'Import Project',
+						value: 'importProject',
+						description: 'Import project data',
+						action: 'Import project data',
+					},
+				],
+				default: 'exportProject',
+			},
+			// External Operations
+			{
+				displayName: 'Operation',
+				name: 'externalOperation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['external'],
+					},
+				},
+				options: [
+					{
+						name: 'Get CSRF Token',
+						value: 'getCSRFToken',
+						description: 'Get CSRF token for secure requests',
+						action: 'Get CSRF token',
+					},
+					{
+						name: 'Get Gyazo Token',
+						value: 'getGyazoToken',
+						description: 'Get OAuth token for Gyazo uploads',
+						action: 'Get Gyazo token',
+					},
+					{
+						name: 'Get Tweet Info',
+						value: 'getTweetInfo',
+						description: 'Get information about a tweet',
+						action: 'Get tweet information',
+					},
+					{
+						name: 'Get Web Page Title',
+						value: 'getWebPageTitle',
+						description: 'Get title of a web page',
+						action: 'Get web page title',
+					},
+				],
+				default: 'getCSRFToken',
+			},
+			// History - Get Snapshot Parameters
+			{
+				displayName: 'Page Title',
+				name: 'historyPageTitle',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['history'],
+						historyOperation: ['getSnapshot', 'getTimestampIds'],
+					},
+				},
+				default: '',
+				placeholder: 'Page Title',
+				description: 'The title of the page to get history for',
+			},
+			{
+				displayName: 'Timestamp ID',
+				name: 'timestampId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['history'],
+						historyOperation: ['getSnapshot'],
+					},
+				},
+				default: '',
+				placeholder: '1234567890',
+				description: 'The timestamp ID of the snapshot to retrieve',
+			},
+			// Import Pages Parameters
+			{
+				displayName: 'Pages Data',
+				name: 'pagesData',
+				type: 'json',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['project'],
+						projectOperation: ['importPages'],
+					},
+				},
+				default: '[]',
+				description: 'JSON array of pages to import',
+			},
+			// Import Project Parameters
+			{
+				displayName: 'Project Data',
+				name: 'projectData',
+				type: 'json',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['exportImport'],
+						exportImportOperation: ['importProject'],
+					},
+				},
+				default: '{}',
+				description: 'Complete project data to import',
+			},
+			// External - Tweet Info Parameters
+			{
+				displayName: 'Tweet URL',
+				name: 'tweetUrl',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['external'],
+						externalOperation: ['getTweetInfo'],
+					},
+				},
+				default: '',
+				placeholder: 'https://twitter.com/user/status/1234567890',
+				description: 'The URL of the tweet to get information for',
+			},
+			// External - Web Page Title Parameters
+			{
+				displayName: 'URL',
+				name: 'webPageUrl',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['external'],
+						externalOperation: ['getWebPageTitle'],
+					},
+				},
+				default: '',
+				placeholder: 'https://example.com',
+				description: 'The URL of the web page to get the title for',
+			},
 		],
 	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
-		const resource = this.getNodeParameter('resource', 0);
-		const operation = this.getNodeParameter('operation', 0);
-
+		const resource = this.getNodeParameter('resource', 0) as string;
+		
 		const credentials = await this.getCredentials('cosenseApi') as CosenseCredentials;
 
 		for (let i = 0; i < items.length; i++) {
@@ -298,13 +535,21 @@ export class Cosense implements INodeType {
 				let responseData;
 
 				if (resource === 'page') {
+					const operation = this.getNodeParameter('operation', i) as string;
 					if (operation === 'get') {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
 						responseData = await apiClient.getPage(pageTitle);
+					} else if (operation === 'getCodeBlocks') {
+						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
+						responseData = await apiClient.getCodeBlocks(pageTitle);
 					} else if (operation === 'list') {
-						const limit = this.getNodeParameter('limit', i) as number;
-						const skip = this.getNodeParameter('skip', i) as number;
-						responseData = await apiClient.listPages(limit, skip);
+						const returnAll = this.getNodeParameter('returnAll', i) as boolean;
+						if (returnAll) {
+							responseData = await apiClient.listAllPages();
+						} else {
+							const limit = this.getNodeParameter('limit', i) as number;
+							responseData = await apiClient.listPages(limit, 0);
+						}
 					} else if (operation === 'search') {
 						const query = this.getNodeParameter('query', i) as string;
 						const searchType = this.getNodeParameter('searchType', i) as string;
@@ -324,6 +569,48 @@ export class Cosense implements INodeType {
 						const lineNumber = this.getNodeParameter('lineNumber', i) as number;
 						const text = this.getNodeParameter('insertText', i) as string;
 						responseData = await apiClient.insertLines(pageTitle, { lineNumber, text });
+					}
+				} else if (resource === 'project') {
+					const operation = this.getNodeParameter('projectOperation', i) as string;
+					if (operation === 'exportPages') {
+						responseData = await apiClient.exportPages();
+					} else if (operation === 'importPages') {
+						const pagesData = this.getNodeParameter('pagesData', i) as string;
+						const pages = JSON.parse(pagesData) as JsonObject[];
+						responseData = await apiClient.importPages(pages);
+					}
+				} else if (resource === 'history') {
+					const operation = this.getNodeParameter('historyOperation', i) as string;
+					const pageTitle = this.getNodeParameter('historyPageTitle', i) as string;
+					if (operation === 'getSnapshot') {
+						const timestampId = this.getNodeParameter('timestampId', i) as string;
+						responseData = await apiClient.getSnapshot(pageTitle, timestampId);
+					} else if (operation === 'getTimestampIds') {
+						responseData = await apiClient.getTimestampIds(pageTitle);
+					}
+				} else if (resource === 'exportImport') {
+					const operation = this.getNodeParameter('exportImportOperation', i) as string;
+					if (operation === 'exportProject') {
+						responseData = await apiClient.exportPages();
+					} else if (operation === 'importProject') {
+						const projectData = this.getNodeParameter('projectData', i) as string;
+						const data = JSON.parse(projectData) as JsonObject;
+						// Handle project data format
+						const pages = Array.isArray(data) ? data : data.pages as JsonObject[] || [];
+						responseData = await apiClient.importPages(pages);
+					}
+				} else if (resource === 'external') {
+					const operation = this.getNodeParameter('externalOperation', i) as string;
+					if (operation === 'getCSRFToken') {
+						responseData = await apiClient.getCSRFToken();
+					} else if (operation === 'getGyazoToken') {
+						responseData = await apiClient.getGyazoToken();
+					} else if (operation === 'getTweetInfo') {
+						const tweetUrl = this.getNodeParameter('tweetUrl', i) as string;
+						responseData = await apiClient.getTweetInfo(tweetUrl);
+					} else if (operation === 'getWebPageTitle') {
+						const url = this.getNodeParameter('webPageUrl', i) as string;
+						responseData = await apiClient.getWebPageTitle(url);
 					}
 				}
 

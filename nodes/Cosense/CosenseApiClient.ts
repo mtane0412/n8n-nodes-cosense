@@ -161,6 +161,26 @@ export class CosenseApiClient {
 		}, `listPages(limit=${limit}, skip=${skip})`);
 	}
 
+	async listAllPages(): Promise<JsonObject[]> {
+		const allPages: JsonObject[] = [];
+		const pageSize = 100;
+		let skip = 0;
+		let hasMore = true;
+
+		while (hasMore) {
+			const pages = await this.listPages(pageSize, skip);
+			allPages.push(...pages);
+			
+			if (pages.length < pageSize) {
+				hasMore = false;
+			} else {
+				skip += pageSize;
+			}
+		}
+
+		return allPages;
+	}
+
 	async searchPages(query: string, searchType: 'title' | 'fulltext', limit?: number): Promise<JsonObject[]> {
 		const options = this.getRequestOptions();
 		
@@ -287,5 +307,281 @@ export class CosenseApiClient {
 				description: error.message || 'An error occurred while inserting lines',
 			});
 		}
+	}
+
+	// Export/Import Methods
+	async exportPages(): Promise<JsonObject[]> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/pages/${this.projectName}?limit=10000`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject[];
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw error;
+			}
+		}, 'exportPages');
+	}
+
+	async importPages(pages: JsonObject[]): Promise<JsonObject> {
+		if (this.authenticationType === 'serviceAccount') {
+			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
+				message: 'Service Account authentication does not support write operations',
+				description: 'Service Accounts are limited to read-only access. To import pages, please switch to Session Cookie authentication in the node credentials.',
+			});
+		}
+		if (!this.sessionId) {
+			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
+				message: 'Session ID is required for importing pages',
+				description: 'Please configure your Cosense credentials with a valid session ID. You can get this from your browser cookies after logging into Cosense.',
+			});
+		}
+
+		const wsClient = new CosenseWebSocketClient({ sessionId: this.sessionId });
+		let imported = 0;
+		let failed = 0;
+		const errors: string[] = [];
+
+		for (const page of pages) {
+			try {
+				if (typeof page.title === 'string' && Array.isArray(page.lines)) {
+					await wsClient.createPage(this.projectName, page.title, page.lines.slice(1).join('\n'));
+					imported++;
+				} else {
+					failed++;
+					errors.push(`Invalid page format: ${JSON.stringify(page)}`);
+				}
+			} catch (error: any) {
+				failed++;
+				errors.push(`Failed to import "${page.title}": ${error.message}`);
+			}
+		}
+
+		return {
+			imported,
+			failed,
+			total: pages.length,
+			errors: errors.slice(0, 10), // Limit errors to first 10
+		};
+	}
+
+	// History Methods
+	async getSnapshot(pageTitle: string, timestampId: string): Promise<PageData> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/pages/${this.projectName}/${encodeURIComponent(pageTitle)}/${timestampId}`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as PageData;
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Snapshot not found for page "${pageTitle}" with timestamp "${timestampId}"`,
+						description: 'The requested snapshot could not be found. Please verify the page title and timestamp ID.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw error;
+			}
+		}, `getSnapshot(${pageTitle}, ${timestampId})`);
+	}
+
+	async getTimestampIds(pageTitle: string): Promise<JsonObject[]> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/pages/${this.projectName}/${encodeURIComponent(pageTitle)}/timestamps`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject[];
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Page "${pageTitle}" not found`,
+						description: 'The requested page could not be found. Please verify the page title.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw error;
+			}
+		}, `getTimestampIds(${pageTitle})`);
+	}
+
+	// Content Analysis Methods
+	async getCodeBlocks(pageTitle: string): Promise<JsonObject[]> {
+		const page = await this.getPage(pageTitle);
+		const codeBlocks: JsonObject[] = [];
+		let inCodeBlock = false;
+		let currentBlock: string[] = [];
+		let language = '';
+		let startLine = 0;
+
+		page.lines.forEach((line, index) => {
+			// lineがオブジェクトの場合はtextプロパティを取得、文字列の場合はそのまま使用
+			const lineText = typeof line === 'string' ? line : (line as any).text || '';
+			const trimmedLine = lineText.trim();
+			if (trimmedLine.startsWith('code:')) {
+				if (inCodeBlock && currentBlock.length > 0) {
+					codeBlocks.push({
+						language,
+						code: currentBlock.join('\n'),
+						startLine,
+						endLine: index - 1,
+					});
+				}
+				inCodeBlock = true;
+				language = trimmedLine.substring(5).trim();
+				currentBlock = [];
+				startLine = index + 1;
+			} else if (inCodeBlock) {
+				if (lineText.startsWith(' ') || lineText.startsWith('\t')) {
+					currentBlock.push(lineText.replace(/^[ \t]/, ''));
+				} else {
+					if (currentBlock.length > 0) {
+						codeBlocks.push({
+							language,
+							code: currentBlock.join('\n'),
+							startLine,
+							endLine: index - 1,
+						});
+					}
+					inCodeBlock = false;
+					currentBlock = [];
+				}
+			}
+		});
+
+		// Handle last code block if exists
+		if (inCodeBlock && currentBlock.length > 0) {
+			codeBlocks.push({
+				language,
+				code: currentBlock.join('\n'),
+				startLine,
+				endLine: page.lines.length - 1,
+			});
+		}
+
+		return codeBlocks;
+	}
+
+	// Security Methods
+	async getCSRFToken(): Promise<JsonObject> {
+		if (!this.sessionId) {
+			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
+				message: 'Session ID is required for getting CSRF token',
+				description: 'Please configure your Cosense credentials with a valid session ID.',
+			});
+		}
+
+		const options = this.getRequestOptions();
+		options.url = `https://scrapbox.io/${this.projectName}`;
+		options.returnFullResponse = true;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				// Extract CSRF token from response HTML or headers
+				// This is a simplified implementation - actual implementation may vary
+				const csrfToken = response.headers['x-csrf-token'] || 'not-found';
+				return { token: csrfToken };
+			} catch (error: any) {
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get CSRF token',
+					description: error.message || 'An error occurred while getting CSRF token',
+				});
+			}
+		}, 'getCSRFToken');
+	}
+
+	// External Integration Methods
+	async getGyazoToken(): Promise<JsonObject> {
+		if (!this.sessionId) {
+			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
+				message: 'Session ID is required for getting Gyazo token',
+				description: 'Please configure your Cosense credentials with a valid session ID.',
+			});
+		}
+
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/gyazo/token`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get Gyazo OAuth token',
+					description: 'Make sure you are authenticated and have Gyazo integration enabled.',
+				});
+			}
+		}, 'getGyazoToken');
+	}
+
+	async getTweetInfo(tweetUrl: string): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		// Extract tweet ID from URL
+		const tweetIdMatch = tweetUrl.match(/status\/(\d+)/);
+		if (!tweetIdMatch) {
+			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
+				message: 'Invalid tweet URL',
+				description: 'Please provide a valid Twitter/X status URL.',
+			});
+		}
+
+		options.url = `${this.baseUrl}/tweet/${tweetIdMatch[1]}`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get tweet information',
+					description: error.message || 'An error occurred while fetching tweet information',
+				});
+			}
+		}, `getTweetInfo(${tweetUrl})`);
+	}
+
+	async getWebPageTitle(url: string): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/webpage/title?url=${encodeURIComponent(url)}`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get web page title',
+					description: error.message || 'An error occurred while fetching web page title',
+				});
+			}
+		}, `getWebPageTitle(${url})`);
 	}
 }

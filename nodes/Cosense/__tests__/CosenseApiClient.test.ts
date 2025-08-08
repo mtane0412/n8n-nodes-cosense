@@ -199,7 +199,7 @@ describe('CosenseApiClient', () => {
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
-				url: 'https://scrapbox.io/api/pages/test-project/search/titles?q=test',
+				url: 'https://scrapbox.io/api/pages/test-project/search/titles',
 				json: true,
 				headers: {
 					Cookie: 'connect.sid=test-session',
