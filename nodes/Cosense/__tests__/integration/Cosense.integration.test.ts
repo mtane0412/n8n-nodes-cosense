@@ -123,7 +123,9 @@ const shouldSkipTests = !hasSessionAuth && !hasServiceAccountAuth;
 			
 			expect(result).toHaveProperty('title', uniqueTestPageTitle);
 			expect(result).toHaveProperty('lines');
-			expect(result.lines.some((line: string) => line.includes('Inserted line'))).toBe(true);
+			const lines = result.lines as string[];
+			expect(Array.isArray(lines)).toBe(true);
+			expect(lines.some((line: string) => line.includes('Inserted line'))).toBe(true);
 		});
 
 		it('should handle page not found error', async () => {
