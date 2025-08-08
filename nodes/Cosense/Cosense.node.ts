@@ -125,6 +125,12 @@ export class Cosense implements INodeType {
 						action: 'Get page text',
 					},
 					{
+						name: 'Get Smart Context',
+						value: 'getSmartContext',
+						description: 'Get related pages context (1-hop or 2-hop links)',
+						action: 'Get smart context',
+					},
+					{
 						name: 'Get Snapshot',
 						value: 'getSnapshot',
 						description: 'Get a specific snapshot for a page',
@@ -187,7 +193,7 @@ export class Cosense implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['page'],
-						operation: ['get', 'getCodeBlocks', 'getTable', 'getText', 'getSnapshots', 'getSnapshot', 'getCommits', 'getIcon'],
+						operation: ['get', 'getCodeBlocks', 'getTable', 'getText', 'getSnapshots', 'getSnapshot', 'getCommits', 'getIcon', 'getSmartContext'],
 					},
 				},
 				default: '',
@@ -405,6 +411,33 @@ export class Cosense implements INodeType {
 				default: '',
 				placeholder: '5f1234567890abcdef123456',
 				description: 'The timestamp ID of the snapshot to retrieve',
+			},
+			// Get Smart Context
+			{
+				displayName: 'Context Type',
+				name: 'contextType',
+				type: 'options',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['page'],
+						operation: ['getSmartContext'],
+					},
+				},
+				options: [
+					{
+						name: '1 Hop Links',
+						value: '1hop',
+						description: 'Get pages directly linked from the current page',
+					},
+					{
+						name: '2 Hop Links',
+						value: '2hop',
+						description: 'Get pages linked from the current page and pages linked from those pages',
+					},
+				],
+				default: '1hop',
+				description: 'The depth of related pages to retrieve',
 			},
 			// Project Operations
 			{
@@ -819,6 +852,11 @@ export class Cosense implements INodeType {
 					} else if (operation === 'getDeleted') {
 						const pageId = this.getNodeParameter('deletedPageId', i) as string;
 						responseData = await apiClient.getDeletedPage(projectName, pageId);
+					} else if (operation === 'getSmartContext') {
+						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
+						const contextType = this.getNodeParameter('contextType', i) as '1hop' | '2hop';
+						const text = await apiClient.getSmartContext(projectName, pageTitle, contextType);
+						responseData = { text, contextType, pageTitle };
 					}
 				} else if (resource === 'project') {
 					const operation = this.getNodeParameter('projectOperation', i) as string;

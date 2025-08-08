@@ -1133,4 +1133,40 @@ export class CosenseApiClient {
 			}
 		}, `searchWatchList(${searchQuery})`);
 	}
+
+	// Smart Context Methods
+	async getSmartContext(projectName: string, pageTitle: string, contextType: '1hop' | '2hop'): Promise<string> {
+		const options = this.getRequestOptions();
+		const endpoint = contextType === '1hop' ? 'export-1hop-links' : 'export-2hop-links';
+		options.url = `${this.baseUrl}/smart-context/${endpoint}/${projectName}.txt?title=${encodeURIComponent(pageTitle)}`;
+		
+		// プレーンテキストのレスポンスを期待
+		options.json = false;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as string;
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Page "${pageTitle}" not found in project "${projectName}"`,
+						description: 'The requested page could not be found. Please verify the page title and project name.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get smart context',
+					description: error.message || 'An error occurred while fetching smart context',
+				});
+			}
+		}, `getSmartContext(${pageTitle}, ${contextType})`);
+	}
 }
