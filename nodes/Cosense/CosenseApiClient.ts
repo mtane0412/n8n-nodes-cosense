@@ -965,4 +965,136 @@ export class CosenseApiClient {
 			}
 		}, `getPageIcon(${pageTitle})`);
 	}
+
+	// Notifications and Invitations Methods
+	async getProjectNotifications(): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/projects/${this.projectName}/notifications`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				if (error.response?.statusCode === 403) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Access denied to project notifications',
+						description: 'You may not have permission to view notifications for this project.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get project notifications',
+					description: error.message || 'An error occurred while fetching project notifications',
+				});
+			}
+		}, 'getProjectNotifications');
+	}
+
+	async getProjectInvitations(): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/projects/${this.projectName}/invitations`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				if (error.response?.statusCode === 403) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Access denied to project invitations',
+						description: 'You may not have permission to view invitations for this project. Only project admins can access invitation information.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get project invitations',
+					description: error.message || 'An error occurred while fetching project invitations',
+				});
+			}
+		}, 'getProjectInvitations');
+	}
+
+	// Deleted Pages and Feed Methods
+	async getDeletedPage(pageId: string): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/deleted-pages/${this.projectName}/${pageId}`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Deleted page with ID "${pageId}" not found`,
+						description: 'The deleted page could not be found. It may have been permanently removed or the page ID is incorrect.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				if (error.response?.statusCode === 403) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Access denied to deleted page information',
+						description: 'You may not have permission to view deleted pages for this project.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get deleted page',
+					description: error.message || 'An error occurred while fetching deleted page',
+				});
+			}
+		}, `getDeletedPage(${pageId})`);
+	}
+
+	async getProjectFeed(): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/feed/${this.projectName}`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				if (error.response?.statusCode === 403) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Access denied to project feed',
+						description: 'You may not have permission to view the feed for this project.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get project feed',
+					description: error.message || 'An error occurred while fetching project feed',
+				});
+			}
+		}, 'getProjectFeed');
+	}
 }

@@ -151,4 +151,177 @@ describe('CosenseApiClient - New Features', () => {
 			expect(result).toEqual(mockSnapshot);
 		});
 	});
+
+	describe('getProjectNotifications', () => {
+		it('should get project notifications', async () => {
+			const mockNotifications = {
+				projectName: 'test-project',
+				notifications: [
+					{
+						id: 'notif1',
+						type: 'pageUpdate',
+						user: { id: 'user1', name: 'User 1' },
+						page: { title: 'Updated Page' },
+						timestamp: 1234567890,
+					},
+					{
+						id: 'notif2',
+						type: 'userJoin',
+						user: { id: 'user2', name: 'User 2' },
+						timestamp: 1234567900,
+					},
+				],
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockNotifications);
+
+			const result = await apiClient.getProjectNotifications();
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/projects/test-project/notifications',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockNotifications);
+		});
+
+		it('should handle authentication types correctly', async () => {
+			const serviceAccountClient = new CosenseApiClient(
+				mockExecuteFunctions as IExecuteFunctions,
+				{
+					projectName: 'test-project',
+					authenticationType: 'serviceAccount',
+					serviceAccountKey: 'test-key',
+				},
+				0,
+			);
+
+			const mockData = { notifications: [] };
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockData);
+
+			await serviceAccountClient.getProjectNotifications();
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/projects/test-project/notifications',
+				json: true,
+				headers: {
+					'x-service-account-access-key': 'test-key',
+				},
+			});
+		});
+	});
+
+	describe('getProjectInvitations', () => {
+		it('should get project invitations', async () => {
+			const mockInvitations = {
+				projectName: 'test-project',
+				invitations: [
+					{
+						id: 'inv1',
+						email: 'user@example.com',
+						invitedBy: { id: 'user1', name: 'Admin' },
+						status: 'pending',
+						createdAt: 1234567890,
+					},
+					{
+						id: 'inv2',
+						email: 'another@example.com',
+						invitedBy: { id: 'user1', name: 'Admin' },
+						status: 'accepted',
+						createdAt: 1234567900,
+					},
+				],
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockInvitations);
+
+			const result = await apiClient.getProjectInvitations();
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/projects/test-project/invitations',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockInvitations);
+		});
+	});
+
+	describe('getDeletedPage', () => {
+		it('should get deleted page information', async () => {
+			const mockDeletedPage = {
+				id: 'page123',
+				title: 'Deleted Page',
+				deletedAt: 1234567890,
+				deletedBy: { id: 'user1', name: 'User 1' },
+				lines: ['Content of the deleted page'],
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockDeletedPage);
+
+			const result = await apiClient.getDeletedPage('page123');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/deleted-pages/test-project/page123',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockDeletedPage);
+		});
+
+		it('should handle 404 error for non-existent deleted page', async () => {
+			const error = new Error('Not Found');
+			error.response = { statusCode: 404 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getDeletedPage('nonexistent')).rejects.toThrow();
+		});
+	});
+
+	describe('getProjectFeed', () => {
+		it('should get project feed', async () => {
+			const mockFeed = {
+				projectName: 'test-project',
+				feed: [
+					{
+						id: 'feed1',
+						type: 'pageCreate',
+						user: { id: 'user1', name: 'User 1' },
+						page: { title: 'New Page' },
+						timestamp: 1234567890,
+					},
+					{
+						id: 'feed2',
+						type: 'pageUpdate',
+						user: { id: 'user2', name: 'User 2' },
+						page: { title: 'Updated Page' },
+						timestamp: 1234567900,
+					},
+				],
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockFeed);
+
+			const result = await apiClient.getProjectFeed();
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/feed/test-project',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockFeed);
+		});
+	});
 });

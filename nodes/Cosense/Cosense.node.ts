@@ -107,6 +107,12 @@ export class Cosense implements INodeType {
 						action: 'Get page commits',
 					},
 					{
+						name: 'Get Deleted',
+						value: 'getDeleted',
+						description: 'Get deleted page information',
+						action: 'Get deleted page',
+					},
+					{
 						name: 'Get Icon',
 						value: 'getIcon',
 						description: 'Get page icon',
@@ -166,6 +172,22 @@ export class Cosense implements INodeType {
 				default: '',
 				placeholder: 'My Page Title',
 				description: 'The title of the page to get',
+			},
+			// Get Deleted Page
+			{
+				displayName: 'Page ID',
+				name: 'deletedPageId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['page'],
+						operation: ['getDeleted'],
+					},
+				},
+				default: '',
+				placeholder: '5f1234567890abcdef123456',
+				description: 'The ID of the deleted page',
 			},
 			// Get Table
 			{
@@ -404,10 +426,28 @@ export class Cosense implements INodeType {
 						action: 'Get project backup list',
 					},
 					{
+						name: 'Get Feed',
+						value: 'getFeed',
+						description: 'Get project feed',
+						action: 'Get project feed',
+					},
+					{
 						name: 'Get Info',
 						value: 'getInfo',
 						description: 'Get project information',
 						action: 'Get project information',
+					},
+					{
+						name: 'Get Invitations',
+						value: 'getInvitations',
+						description: 'Get project invitations',
+						action: 'Get project invitations',
+					},
+					{
+						name: 'Get Notifications',
+						value: 'getNotifications',
+						description: 'Get project notifications',
+						action: 'Get project notifications',
 					},
 					{
 						name: 'Get Stream',
@@ -738,6 +778,9 @@ export class Cosense implements INodeType {
 					} else if (operation === 'getIcon') {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
 						responseData = await apiClient.getPageIcon(pageTitle);
+					} else if (operation === 'getDeleted') {
+						const pageId = this.getNodeParameter('deletedPageId', i) as string;
+						responseData = await apiClient.getDeletedPage(pageId);
 					}
 				} else if (resource === 'project') {
 					const operation = this.getNodeParameter('projectOperation', i) as string;
@@ -757,6 +800,12 @@ export class Cosense implements INodeType {
 						responseData = await apiClient.getProjectBackup(backupId);
 					} else if (operation === 'getStream') {
 						responseData = await apiClient.getProjectStream();
+					} else if (operation === 'getNotifications') {
+						responseData = await apiClient.getProjectNotifications();
+					} else if (operation === 'getInvitations') {
+						responseData = await apiClient.getProjectInvitations();
+					} else if (operation === 'getFeed') {
+						responseData = await apiClient.getProjectFeed();
 					}
 				} else if (resource === 'user') {
 					const operation = this.getNodeParameter('userOperation', i) as string;
