@@ -950,19 +950,6 @@ export class Cosense implements INodeType {
 						const pages = Array.isArray(data) ? data : data.pages as JsonObject[] || [];
 						responseData = await apiClient.importPages(projectName, pages);
 					}
-				} else if (resource === 'external') {
-					const operation = this.getNodeParameter('externalOperation', i) as string;
-					if (operation === 'getCSRFToken') {
-						responseData = await apiClient.getCSRFToken(projectName);
-					} else if (operation === 'getGyazoToken') {
-						responseData = await apiClient.getGyazoToken();
-					} else if (operation === 'getTweetInfo') {
-						const tweetUrl = this.getNodeParameter('tweetUrl', i) as string;
-						responseData = await apiClient.getTweetInfo(tweetUrl);
-					} else if (operation === 'getWebPageTitle') {
-						const url = this.getNodeParameter('webPageUrl', i) as string;
-						responseData = await apiClient.getWebPageTitle(url);
-					}
 				}
 
 				if (Array.isArray(responseData)) {
