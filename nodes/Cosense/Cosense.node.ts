@@ -465,6 +465,12 @@ export class Cosense implements INodeType {
 						action: 'Get project notifications',
 					},
 					{
+						name: 'Get Storage Usage',
+						value: 'getStorageUsage',
+						description: 'Get project storage usage information',
+						action: 'Get project storage usage',
+					},
+					{
 						name: 'Get Stream',
 						value: 'getStream',
 						description: 'Get project stream (updates)',
@@ -665,7 +671,7 @@ export class Cosense implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['project'],
-						projectOperation: ['exportPages', 'getBackup', 'getBackupList', 'getFeed', 'getInfo', 'getInvitations', 'getNotifications', 'getStream', 'importPages'],
+						projectOperation: ['exportPages', 'getBackup', 'getBackupList', 'getFeed', 'getInfo', 'getInvitations', 'getNotifications', 'getStorageUsage', 'getStream', 'importPages'],
 					},
 				},
 				default: '',
@@ -889,6 +895,8 @@ export class Cosense implements INodeType {
 						responseData = await apiClient.exportPages(projectName);
 					} else if (operation === 'getInfo') {
 						responseData = await apiClient.getProjectInfo(projectName);
+					} else if (operation === 'getStorageUsage') {
+						responseData = await apiClient.getProjectStorageUsage(projectName);
 					} else if (operation === 'importPages') {
 						const pagesData = this.getNodeParameter('pagesData', i) as string;
 						const pages = JSON.parse(pagesData) as JsonObject[];

@@ -745,6 +745,43 @@ export class CosenseApiClient {
 		}, `getProjectInfo(${projectName})`);
 	}
 
+	async getProjectStorageUsage(projectName: string): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/gcs/${projectName}/usage`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Project "${projectName}" not found`,
+						description: 'The requested project could not be found. Please verify the project name.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				if (error.response?.statusCode === 403) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Access denied to project storage information',
+						description: 'You may not have permission to view storage usage for this project. This information might be restricted to project administrators.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get project storage usage',
+					description: error.message || 'An error occurred while fetching project storage usage',
+				});
+			}
+		}, `getProjectStorageUsage(${projectName})`);
+	}
+
 	// History and Snapshot Methods
 	async getPageSnapshots(projectName: string, pageId: string): Promise<PageSnapshot[]> {
 		const options = this.getRequestOptions();

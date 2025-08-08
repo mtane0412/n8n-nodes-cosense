@@ -409,6 +409,62 @@ describe('CosenseApiClient', () => {
 		});
 	});
 
+	describe('getProjectStorageUsage', () => {
+		it('should get project storage usage successfully', async () => {
+			const mockResponse = {
+				storageUsed: 52428800, // 50MB in bytes
+				storageLimit: 1073741824, // 1GB in bytes
+				storagePercentage: 4.88,
+				pageCount: 150,
+				imageCount: 25,
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await apiClient.getProjectStorageUsage('test-project');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/gcs/test-project/usage',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+
+		it('should handle 403 error for non-admin user', async () => {
+			const error = new Error('Forbidden');
+			(error as any).response = { statusCode: 403 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getProjectStorageUsage('test-project'))
+				.rejects.toThrow('Access denied to project storage information');
+		});
+
+		it('should work with service account authentication', async () => {
+			const mockResponse = {
+				storageUsed: 104857600,
+				storageLimit: 1073741824,
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await serviceAccountApiClient.getProjectStorageUsage('test-project');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/gcs/test-project/usage',
+				json: true,
+				headers: {
+					'x-service-account-access-key': 'test-service-account-key',
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+	});
+
 	describe('getTable', () => {
 		it('should get table data as CSV', async () => {
 			const mockCsvData = 'col1,col2,col3\nval1,val2,val3';
