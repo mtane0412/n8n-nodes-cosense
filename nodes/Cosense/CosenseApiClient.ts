@@ -234,55 +234,60 @@ export class CosenseApiClient {
 		return allPages;
 	}
 
-	async searchPages(projectName: string, query: string, searchType: 'title' | 'fulltext', limit?: number): Promise<JsonObject[]> {
+	async searchPagesByTitle(projectName: string, query?: string, limit?: number): Promise<JsonObject[]> {
 		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/pages/${projectName}/search/titles`;
 		
-		if (searchType === 'title') {
-			// /search/titles エンドポイントは全ページを返すので、クライアント側でフィルタリング
-			options.url = `${this.baseUrl}/pages/${projectName}/search/titles`;
-			
-			return this.executeWithRetry(async () => {
-				try {
-					const response = await this.executeFunctions.helpers.httpRequest(options) as JsonObject[];
-					// クエリに基づいてタイトルをフィルタリング（大文字小文字を無視）
-					const filtered = response.filter(page => 
-						(page.title as string).toLowerCase().includes(query.toLowerCase())
-					);
-					// limit が指定されていれば、その数だけ返す
-					return limit ? filtered.slice(0, limit) : filtered;
-				} catch (error: any) {
-					if (error.response?.statusCode === 401) {
-						throw new NodeApiError(this.executeFunctions.getNode(), error, {
-							message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
-							description: this.authenticationType === 'serviceAccount' 
-								? 'Please verify your Service Account Access Key is valid and has access to this project.'
-								: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
-						});
-					}
-					throw error;
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options) as JsonObject[];
+				
+				// クエリが指定されていない場合は全件返す
+				if (!query) {
+					return limit ? response.slice(0, limit) : response;
 				}
-			}, `searchPages(${query}, ${searchType})`);
-		} else {
-			// フルテキスト検索
-			options.url = `${this.baseUrl}/pages/${projectName}/search/query?q=${encodeURIComponent(query)}&limit=${limit || 50}`;
-			
-			return this.executeWithRetry(async () => {
-				try {
-					const response = await this.executeFunctions.helpers.httpRequest(options);
-					return response as JsonObject[];
-				} catch (error: any) {
-					if (error.response?.statusCode === 401) {
-						throw new NodeApiError(this.executeFunctions.getNode(), error, {
-							message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
-							description: this.authenticationType === 'serviceAccount' 
-								? 'Please verify your Service Account Access Key is valid and has access to this project.'
-								: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
-						});
-					}
-					throw error;
+				
+				// クエリに基づいてタイトルをフィルタリング（大文字小文字を無視）
+				const filtered = response.filter(page => 
+					(page.title as string).toLowerCase().includes(query.toLowerCase())
+				);
+				
+				// limit が指定されていれば、その数だけ返す
+				return limit ? filtered.slice(0, limit) : filtered;
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
 				}
-			}, `searchPages(${query}, ${searchType})`);
-		}
+				throw error;
+			}
+		}, `searchPagesByTitle(${query || 'all'})`);
+	}
+
+	async searchPagesByFullText(projectName: string, query: string): Promise<JsonObject[]> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/pages/${projectName}/search/query?q=${encodeURIComponent(query)}`;
+		
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject[];
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw error;
+			}
+		}, `searchPagesByFullText(${query})`);
 	}
 
 	async createPage(projectName: string, data: CreatePageData): Promise<PageData> {

@@ -150,10 +150,16 @@ export class Cosense implements INodeType {
 						action: 'List pages',
 					},
 					{
-						name: 'Search',
-						value: 'search',
-						description: 'Search pages by keyword',
-						action: 'Search pages',
+						name: 'Search by Full Text',
+						value: 'searchByFullText',
+						description: 'Search pages by content (full text search)',
+						action: 'Search pages by full text',
+					},
+					{
+						name: 'Search Page Titles',
+						value: 'searchPageTitles',
+						description: 'Search or list all page titles (with optional filtering)',
+						action: 'Search page titles',
 					},
 				],
 				default: 'get',
@@ -337,55 +343,29 @@ export class Cosense implements INodeType {
 				placeholder: 'Text to insert',
 				description: 'The text to insert (each line becomes a line in Cosense)',
 			},
-			// Search Pages
+			// Search Pages by Title
 			{
-				displayName: 'Query',
-				name: 'query',
+				displayName: 'Title Query',
+				name: 'titleQuery',
 				type: 'string',
-				required: true,
 				displayOptions: {
 					show: {
 						resource: ['page'],
-						operation: ['search'],
+						operation: ['searchPageTitles'],
 					},
 				},
 				default: '',
-				placeholder: 'search keyword',
-				description: 'The search query',
-			},
-			{
-				displayName: 'Search Type',
-				name: 'searchType',
-				type: 'options',
-				displayOptions: {
-					show: {
-						resource: ['page'],
-						operation: ['search'],
-					},
-				},
-				options: [
-					{
-						name: 'Title',
-						value: 'title',
-						description: 'Search in page titles only',
-					},
-					{
-						name: 'Full Text',
-						value: 'fulltext',
-						description: 'Search in page content',
-					},
-				],
-				default: 'title',
-				description: 'Type of search to perform',
+				placeholder: 'search keyword (optional)',
+				description: 'Filter page titles by keyword. Leave empty to get all page titles.',
 			},
 			{
 				displayName: 'Limit',
-				name: 'searchLimit',
+				name: 'titleSearchLimit',
 				type: 'number',
 				displayOptions: {
 					show: {
 						resource: ['page'],
-						operation: ['search'],
+						operation: ['searchPageTitles'],
 					},
 				},
 				typeOptions: {
@@ -394,6 +374,22 @@ export class Cosense implements INodeType {
 				},
 				default: 50,
 				description: 'Maximum number of search results to return',
+			},
+			// Search Pages by Full Text
+			{
+				displayName: 'Query',
+				name: 'fullTextQuery',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['page'],
+						operation: ['searchByFullText'],
+					},
+				},
+				default: '',
+				placeholder: 'search keyword',
+				description: 'The search query for full text search',
 			},
 			// Get Snapshot
 			{
@@ -784,11 +780,13 @@ export class Cosense implements INodeType {
 							const limit = this.getNodeParameter('limit', i) as number;
 							responseData = await apiClient.listPages(projectName, limit, 0);
 						}
-					} else if (operation === 'search') {
-						const query = this.getNodeParameter('query', i) as string;
-						const searchType = this.getNodeParameter('searchType', i) as string;
-						const limit = this.getNodeParameter('searchLimit', i) as number;
-						responseData = await apiClient.searchPages(projectName, query, searchType as 'title' | 'fulltext', limit);
+					} else if (operation === 'searchPageTitles') {
+						const query = this.getNodeParameter('titleQuery', i) as string;
+						const limit = this.getNodeParameter('titleSearchLimit', i) as number;
+						responseData = await apiClient.searchPagesByTitle(projectName, query || undefined, limit);
+					} else if (operation === 'searchByFullText') {
+						const query = this.getNodeParameter('fullTextQuery', i) as string;
+						responseData = await apiClient.searchPagesByFullText(projectName, query);
 					} else if (operation === 'create') {
 						const title = this.getNodeParameter('createPageTitle', i) as string;
 						const content = this.getNodeParameter('content', i) as string;
