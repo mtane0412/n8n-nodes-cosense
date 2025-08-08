@@ -132,9 +132,9 @@
    - ✅ GET `/api/deleted-pages/:projectname/:pageid` - getDeletedPage()として実装
    - ✅ GET `/api/feed/:projectname` - getProjectFeed()として実装
 
-3. **検索拡張API** 🔲 未実装
-   - GET `/api/projects/search/query`
-   - GET `/api/projects/search/watch-list`
+3. **検索拡張API** ✅ 完了（2025-08-08）
+   - ✅ GET `/api/projects/search/query` - searchProjects()として実装
+   - ✅ GET `/api/projects/search/watch-list` - searchWatchList()として実装
 
 4. **その他のAPI** 🔲 未実装
    - GET `/api/gcs/:projectname/usage`
@@ -142,11 +142,10 @@
    - GET `/api/google-map/static-map`
 
 5. **実装内容**
-   - CosenseApiClientに4つの新しいAPIメソッドを追加（getProjectNotifications, getProjectInvitations, getDeletedPage, getProjectFeed）
-   - Projectリソースに新しい操作を追加（Get Notifications, Get Invitations, Get Feed）
+   - CosenseApiClientに6つの新しいAPIメソッドを追加（getProjectNotifications, getProjectInvitations, getDeletedPage, getProjectFeed, searchProjects, searchWatchList）
+   - Projectリソースに新しい操作を追加（Get Notifications, Get Invitations, Get Feed, Search Query, Search Watch List）
    - Pageリソースに新しい操作を追加（Get Deleted）
-   - すべての新機能のユニットテストを作成
-   - Lintチェックとビルドの成功を確認
+   - すべての新機能のLintチェックとビルドの成功を確認
 
 ## 技術的考慮事項
 

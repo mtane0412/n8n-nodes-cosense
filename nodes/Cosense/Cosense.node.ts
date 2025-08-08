@@ -476,6 +476,18 @@ export class Cosense implements INodeType {
 						description: 'Import pages into a project',
 						action: 'Import pages to project',
 					},
+					{
+						name: 'Search Query',
+						value: 'searchQuery',
+						description: 'Search across projects',
+						action: 'Search across projects',
+					},
+					{
+						name: 'Search Watch List',
+						value: 'searchWatchList',
+						description: 'Search in specific projects',
+						action: 'Search in specific projects',
+					},
 				],
 				default: 'exportPages',
 			},
@@ -691,6 +703,38 @@ export class Cosense implements INodeType {
 				default: '[]',
 				description: 'JSON array of pages to import',
 			},
+			// Search Query Parameters
+			{
+				displayName: 'Search Query',
+				name: 'searchQuery',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['project'],
+						projectOperation: ['searchQuery', 'searchWatchList'],
+					},
+				},
+				default: '',
+				placeholder: 'search keyword',
+				description: 'The search query. Use space to separate AND terms, prefix with - for NOT terms.',
+			},
+			// Search Watch List Parameters
+			{
+				displayName: 'Project IDs',
+				name: 'projectIds',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['project'],
+						projectOperation: ['searchWatchList'],
+					},
+				},
+				default: '',
+				placeholder: 'project1,project2,project3',
+				description: 'Comma-separated list of project IDs to search in. Recommended limit: 200-300 projects. Note: Using IDs of projects you are a member of may cause 500 errors.',
+			},
 			// Export/Import Project Parameters
 			{
 				displayName: 'Project Name',
@@ -770,8 +814,14 @@ export class Cosense implements INodeType {
 				
 				// Get project name based on resource type
 				let projectName = '';
-				if (['page', 'history', 'project', 'exportImport'].includes(resource)) {
+				if (['page', 'history', 'exportImport'].includes(resource)) {
 					projectName = this.getNodeParameter('projectName', i) as string;
+				} else if (resource === 'project') {
+					const operation = this.getNodeParameter('projectOperation', i) as string;
+					// searchQuery and searchWatchList don't need projectName
+					if (!['searchQuery', 'searchWatchList'].includes(operation)) {
+						projectName = this.getNodeParameter('projectName', i) as string;
+					}
 				}
 
 				if (resource === 'page') {
@@ -856,6 +906,14 @@ export class Cosense implements INodeType {
 						responseData = await apiClient.getProjectInvitations(projectName);
 					} else if (operation === 'getFeed') {
 						responseData = await apiClient.getProjectFeed(projectName);
+					} else if (operation === 'searchQuery') {
+						const searchQuery = this.getNodeParameter('searchQuery', i) as string;
+						responseData = await apiClient.searchProjects(searchQuery);
+					} else if (operation === 'searchWatchList') {
+						const searchQuery = this.getNodeParameter('searchQuery', i) as string;
+						const projectIds = this.getNodeParameter('projectIds', i) as string;
+						const ids = projectIds.split(',').map(id => id.trim()).filter(id => id);
+						responseData = await apiClient.searchWatchList(searchQuery, ids);
 					}
 				} else if (resource === 'user') {
 					const operation = this.getNodeParameter('userOperation', i) as string;

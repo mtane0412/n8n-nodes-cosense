@@ -1096,4 +1096,68 @@ export class CosenseApiClient {
 			}
 		}, 'getProjectFeed');
 	}
+
+	// Search Methods
+	async searchProjects(searchQuery: string): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/projects/search/query?q=${encodeURIComponent(searchQuery)}`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to search projects',
+					description: error.message || 'An error occurred while searching projects',
+				});
+			}
+		}, `searchProjects(${searchQuery})`);
+	}
+
+	async searchWatchList(searchQuery: string, projectIds: string[]): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		const idsParam = projectIds.map(id => `ids=${encodeURIComponent(id)}`).join('&');
+		options.url = `${this.baseUrl}/projects/search/watch-list?q=${encodeURIComponent(searchQuery)}&${idsParam}`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				if (error.response?.statusCode === 414) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'URI too long - too many project IDs specified',
+						description: 'Please reduce the number of project IDs. Recommended limit is 200-300 projects.',
+					});
+				}
+				if (error.response?.statusCode === 500) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Internal server error',
+						description: 'This might occur when using personal project names or projects you are a member of. Try using public project names instead. Project names should be the part that appears in the URL (e.g., "help" from scrapbox.io/help).',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to search watch list',
+					description: error.message || 'An error occurred while searching watch list',
+				});
+			}
+		}, `searchWatchList(${searchQuery})`);
+	}
 }
