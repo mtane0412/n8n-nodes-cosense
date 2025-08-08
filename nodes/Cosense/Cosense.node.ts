@@ -6,10 +6,10 @@ import type {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
-	IHttpRequestOptions,
 	JsonObject,
 } from 'n8n-workflow';
-import { NodeApiError, NodeConnectionType } from 'n8n-workflow';
+import { NodeConnectionType } from 'n8n-workflow';
+import { CosenseApiClient, type CosenseCredentials } from './CosenseApiClient';
 
 export class Cosense implements INodeType {
 	description: INodeTypeDescription = {
@@ -57,10 +57,22 @@ export class Cosense implements INodeType {
 				},
 				options: [
 					{
+						name: 'Create',
+						value: 'create',
+						description: 'Create a new page',
+						action: 'Create a page',
+					},
+					{
 						name: 'Get',
 						value: 'get',
 						description: 'Get a page by title',
 						action: 'Get a page',
+					},
+					{
+						name: 'Insert Lines',
+						value: 'insertLines',
+						description: 'Insert text into an existing page',
+						action: 'Insert lines into a page',
 					},
 					{
 						name: 'List',
@@ -125,6 +137,91 @@ export class Cosense implements INodeType {
 				},
 				default: 0,
 				description: 'Number of pages to skip',
+			},
+			// Create Page
+			{
+				displayName: 'Page Title',
+				name: 'createPageTitle',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['page'],
+						operation: ['create'],
+					},
+				},
+				default: '',
+				placeholder: 'New Page Title',
+				description: 'The title of the page to create',
+			},
+			{
+				displayName: 'Content',
+				name: 'content',
+				type: 'string',
+				typeOptions: {
+					rows: 10,
+				},
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['page'],
+						operation: ['create'],
+					},
+				},
+				default: '',
+				placeholder: 'Page content (each line becomes a line in Cosense)',
+				description: 'The content of the page',
+			},
+			// Insert Lines
+			{
+				displayName: 'Page Title',
+				name: 'insertPageTitle',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['page'],
+						operation: ['insertLines'],
+					},
+				},
+				default: '',
+				placeholder: 'Page Title',
+				description: 'The title of the page to insert lines into',
+			},
+			{
+				displayName: 'Line Number',
+				name: 'lineNumber',
+				type: 'number',
+				typeOptions: {
+					minValue: 0,
+				},
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['page'],
+						operation: ['insertLines'],
+					},
+				},
+				default: 0,
+				description: 'The line number after which to insert the text (0 = beginning of page)',
+			},
+			{
+				displayName: 'Text',
+				name: 'insertText',
+				type: 'string',
+				typeOptions: {
+					rows: 5,
+				},
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['page'],
+						operation: ['insertLines'],
+					},
+				},
+				default: '',
+				placeholder: 'Text to insert',
+				description: 'The text to insert (each line becomes a line in Cosense)',
 			},
 			// Search Pages
 			{
@@ -193,61 +290,39 @@ export class Cosense implements INodeType {
 		const resource = this.getNodeParameter('resource', 0);
 		const operation = this.getNodeParameter('operation', 0);
 
-		const credentials = await this.getCredentials('cosenseApi');
-		const projectName = credentials.projectName as string;
-		const sessionId = credentials.sessionId as string;
-
-		const baseUrl = 'https://scrapbox.io/api';
+		const credentials = await this.getCredentials('cosenseApi') as CosenseCredentials;
 
 		for (let i = 0; i < items.length; i++) {
 			try {
+				const apiClient = new CosenseApiClient(this, credentials, i);
 				let responseData;
-				const options: IHttpRequestOptions = {
-					method: 'GET',
-					url: '',
-					json: true,
-				};
-
-				// セッションIDが設定されている場合はCookieを追加
-				if (sessionId) {
-					options.headers = {
-						Cookie: `connect.sid=${sessionId}`,
-					};
-				}
 
 				if (resource === 'page') {
 					if (operation === 'get') {
 						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
-						options.url = `${baseUrl}/pages/${projectName}/${encodeURIComponent(pageTitle)}`;
-						
-						try {
-							responseData = await this.helpers.httpRequest(options);
-						} catch (error: any) {
-							if (error.response?.statusCode === 404) {
-								throw new NodeApiError(this.getNode(), error, {
-									message: `Page "${pageTitle}" not found in project "${projectName}"`,
-								});
-							}
-							throw error;
-						}
+						responseData = await apiClient.getPage(pageTitle);
 					} else if (operation === 'list') {
 						const limit = this.getNodeParameter('limit', i) as number;
 						const skip = this.getNodeParameter('skip', i) as number;
-						
-						options.url = `${baseUrl}/pages/${projectName}?limit=${limit}&skip=${skip}`;
-						responseData = await this.helpers.httpRequest(options);
+						responseData = await apiClient.listPages(limit, skip);
 					} else if (operation === 'search') {
 						const query = this.getNodeParameter('query', i) as string;
 						const searchType = this.getNodeParameter('searchType', i) as string;
 						const limit = this.getNodeParameter('searchLimit', i) as number;
-						
-						if (searchType === 'title') {
-							options.url = `${baseUrl}/pages/${projectName}/search/titles?q=${encodeURIComponent(query)}`;
-						} else {
-							options.url = `${baseUrl}/pages/${projectName}/search/query?q=${encodeURIComponent(query)}&limit=${limit}`;
+						responseData = await apiClient.searchPages(query, searchType as 'title' | 'fulltext', limit);
+					} else if (operation === 'create') {
+						const title = this.getNodeParameter('createPageTitle', i) as string;
+						const content = this.getNodeParameter('content', i) as string;
+						let lines = content.split('\n');
+						if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) {
+							lines = [title]; // タイトルを最初の行に設定
 						}
-						
-						responseData = await this.helpers.httpRequest(options);
+						responseData = await apiClient.createPage({ title, lines });
+					} else if (operation === 'insertLines') {
+						const pageTitle = this.getNodeParameter('insertPageTitle', i) as string;
+						const lineNumber = this.getNodeParameter('lineNumber', i) as number;
+						const text = this.getNodeParameter('insertText', i) as string;
+						responseData = await apiClient.insertLines(pageTitle, { lineNumber, text });
 					}
 				}
 
@@ -272,11 +347,6 @@ export class Cosense implements INodeType {
 						pairedItem: { item: i },
 					});
 				} else {
-					if (error.response?.statusCode === 401) {
-						throw new NodeApiError(this.getNode(), error, {
-							message: 'Authentication failed. Please check your session ID.',
-						});
-					}
 					throw error;
 				}
 			}

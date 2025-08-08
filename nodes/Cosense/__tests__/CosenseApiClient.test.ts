@@ -1,0 +1,243 @@
+/**
+ * CosenseApiClientのユニットテスト
+ */
+import { CosenseApiClient } from '../CosenseApiClient';
+import type { INode } from 'n8n-workflow';
+import { NodeApiError } from 'n8n-workflow';
+
+describe('CosenseApiClient', () => {
+	let mockExecuteFunctions: any;
+	let mockNode: INode;
+	let apiClient: CosenseApiClient;
+
+	beforeEach(() => {
+		mockNode = {
+			id: 'test-node-id',
+			name: 'Cosense',
+			type: 'cosense',
+			typeVersion: 1,
+			position: [0, 0],
+			parameters: {},
+		};
+
+		mockExecuteFunctions = {
+			getNode: jest.fn().mockReturnValue(mockNode),
+			helpers: {
+				httpRequest: jest.fn(),
+			},
+		} as any;
+
+		apiClient = new CosenseApiClient(
+			mockExecuteFunctions,
+			{ projectName: 'test-project', sessionId: 'test-session' },
+			0
+		);
+	});
+
+	describe('getPage', () => {
+		it('should get a page successfully', async () => {
+			const mockResponse = {
+				title: 'Test Page',
+				lines: ['Line 1', 'Line 2'],
+				id: '123',
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await apiClient.getPage('Test Page');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/pages/test-project/Test%20Page',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+
+		it('should throw NodeApiError for 404', async () => {
+			const error = new Error('Not found');
+			(error as any).response = { statusCode: 404 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getPage('Non-existent')).rejects.toThrow(NodeApiError);
+		});
+	});
+
+	describe('createPage', () => {
+		it('should create a page successfully', async () => {
+			const mockResponse = {
+				title: 'New Page',
+				lines: ['Title', 'Content'],
+				id: '456',
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await apiClient.createPage({
+				title: 'New Page',
+				lines: ['Title', 'Content'],
+			});
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'POST',
+				url: 'https://scrapbox.io/api/pages/test-project/New%20Page',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+				body: {
+					lines: ['Title', 'Content'],
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+
+		it('should throw error when no session ID', async () => {
+			apiClient = new CosenseApiClient(
+				mockExecuteFunctions,
+				{ projectName: 'test-project' },
+				0
+			);
+
+			await expect(apiClient.createPage({
+				title: 'New Page',
+				lines: ['Content'],
+			})).rejects.toThrow(NodeApiError);
+		});
+	});
+
+	describe('insertLines', () => {
+		it('should insert lines successfully', async () => {
+			const existingPage = {
+				title: 'Test Page',
+				lines: ['Line 1', 'Line 2', 'Line 3'],
+			};
+
+			const updatedPage = {
+				title: 'Test Page',
+				lines: ['Line 1', 'Inserted Line', 'Line 2', 'Line 3'],
+			};
+
+			mockExecuteFunctions.helpers.httpRequest
+				.mockResolvedValueOnce(existingPage)
+				.mockResolvedValueOnce(updatedPage);
+
+			const result = await apiClient.insertLines('Test Page', {
+				lineNumber: 0,
+				text: 'Inserted Line',
+			});
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledTimes(2);
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenNthCalledWith(2, {
+				method: 'POST',
+				url: 'https://scrapbox.io/api/pages/test-project/Test%20Page',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+				body: {
+					lines: ['Line 1', 'Inserted Line', 'Line 2', 'Line 3'],
+				},
+			});
+			expect(result).toEqual(updatedPage);
+		});
+
+		it('should handle multi-line insert', async () => {
+			const existingPage = {
+				title: 'Test Page',
+				lines: ['Line 1'],
+			};
+
+			mockExecuteFunctions.helpers.httpRequest
+				.mockResolvedValueOnce(existingPage)
+				.mockResolvedValueOnce({});
+
+			await apiClient.insertLines('Test Page', {
+				lineNumber: 0,
+				text: 'Line A\nLine B\nLine C',
+			});
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenNthCalledWith(2, {
+				method: 'POST',
+				url: 'https://scrapbox.io/api/pages/test-project/Test%20Page',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+				body: {
+					lines: ['Line 1', 'Line A', 'Line B', 'Line C'],
+				},
+			});
+		});
+	});
+
+	describe('listPages', () => {
+		it('should list pages with pagination', async () => {
+			const mockResponse = [
+				{ title: 'Page 1' },
+				{ title: 'Page 2' },
+			];
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await apiClient.listPages(10, 5);
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/pages/test-project?limit=10&skip=5',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+	});
+
+	describe('searchPages', () => {
+		it('should search by title', async () => {
+			const mockResponse = [
+				{ title: 'Match 1' },
+				{ title: 'Match 2' },
+			];
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await apiClient.searchPages('test', 'title');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/pages/test-project/search/titles?q=test',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+
+		it('should search full text', async () => {
+			const mockResponse = [
+				{ title: 'Match 1' },
+				{ title: 'Match 2' },
+			];
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const result = await apiClient.searchPages('query', 'fulltext', 100);
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/pages/test-project/search/query?q=query&limit=100',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockResponse);
+		});
+	});
+});

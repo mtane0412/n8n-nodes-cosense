@@ -74,9 +74,11 @@ n8n-nodes-cosense/
 ├── nodes/
 │   ├── Cosense/
 │   │   ├── Cosense.node.ts         # ノードのメイン実装 ✅
+│   │   ├── CosenseApiClient.ts     # API通信のクライアント ✅
 │   │   ├── cosense.svg             # ノードアイコン ✅
 │   │   └── __tests__/
-│   │       └── Cosense.node.test.ts # ユニットテスト ✅
+│   │       ├── Cosense.node.test.ts # ノードのユニットテスト ✅
+│   │       └── CosenseApiClient.test.ts # APIクライアントのテスト ✅
 ├── .eslintignore                    # ESLint除外設定 ✅
 ├── jest.config.js                   # Jest設定 ✅
 └── implementation-plan.md          # この計画書
@@ -98,8 +100,8 @@ n8n-nodes-cosense/
    - List Pages操作
    - Search Pages操作（タイトル検索・全文検索）
 
-### フェーズ2: 書き込み機能の追加
-4. **書き込み操作の実装**
+### フェーズ2: 書き込み機能の追加 ✅ 完了
+4. **書き込み操作の実装** ✅
    - Insert Lines操作
    - Create Page操作
    - エラーハンドリングの強化
@@ -163,3 +165,14 @@ n8n-nodes-cosense/
   - エラーハンドリング（404、401）を実装
   - ページネーション対応（List Pages）
   - continueOnFailオプションのサポート
+
+- **フェーズ2完了**: 書き込み機能の追加
+  - CosenseApiClientクラスを作成（API通信の共通処理）
+  - Create Page操作を実装（新規ページ作成）
+  - Insert Lines操作を実装（既存ページへの行挿入）
+  - APIクライアントのユニットテストを作成
+  - Cosenseノードのテストを更新
+  - 認証エラー、404エラー、409エラーの適切なハンドリング
+  - 全テストが成功（21テスト）
+  - ESLintチェックをパス
+  - TypeScriptビルドが成功

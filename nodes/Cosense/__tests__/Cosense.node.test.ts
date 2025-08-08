@@ -1,25 +1,30 @@
 /**
  * Cosenseノードのユニットテスト
  */
-import { IExecuteFunctions, INodeExecutionData, NodeApiError } from 'n8n-workflow';
+import { NodeApiError } from 'n8n-workflow';
 import { Cosense } from '../Cosense.node';
 
-// モックの型定義
-interface MockHelpers {
-	httpRequest: jest.Mock;
-}
+// CosenseApiClientをモック
+jest.mock('../CosenseApiClient');
+import { CosenseApiClient } from '../CosenseApiClient';
 
-interface MockExecuteFunctions extends IExecuteFunctions {
-	getInputData: jest.Mock;
-	getNodeParameter: jest.Mock;
-	getCredentials: jest.Mock;
-	continueOnFail: jest.Mock;
-	getNode: jest.Mock;
-	helpers: MockHelpers;
-}
+// CosenseApiClientのモック
+const mockGetPage = jest.fn();
+const mockListPages = jest.fn();
+const mockSearchPages = jest.fn();
+const mockCreatePage = jest.fn();
+const mockInsertLines = jest.fn();
+
+(CosenseApiClient as jest.MockedClass<typeof CosenseApiClient>).mockImplementation(() => ({
+	getPage: mockGetPage,
+	listPages: mockListPages,
+	searchPages: mockSearchPages,
+	createPage: mockCreatePage,
+	insertLines: mockInsertLines,
+} as any));
 
 describe('Cosense Node', () => {
-	let mockExecuteFunctions: MockExecuteFunctions;
+	let mockExecuteFunctions: any;
 	let cosenseNode: Cosense;
 
 	beforeEach(() => {
@@ -33,7 +38,7 @@ describe('Cosense Node', () => {
 			helpers: {
 				httpRequest: jest.fn(),
 			},
-		} as any;
+		};
 
 		cosenseNode = new Cosense();
 
@@ -43,8 +48,24 @@ describe('Cosense Node', () => {
 			projectName: 'test-project',
 			sessionId: 'test-session-id',
 		});
-		mockExecuteFunctions.getNode.mockReturnValue({ name: 'Cosense' });
+		mockExecuteFunctions.getNode.mockReturnValue({ 
+			id: 'test-node-id',
+			name: 'Cosense',
+			type: 'cosense',
+			typeVersion: 1,
+			position: [0, 0],
+			parameters: {}
+		});
 		mockExecuteFunctions.continueOnFail.mockReturnValue(false);
+	});
+
+	beforeEach(() => {
+		// モックをリセット
+		mockGetPage.mockReset();
+		mockListPages.mockReset();
+		mockSearchPages.mockReset();
+		mockCreatePage.mockReset();
+		mockInsertLines.mockReset();
 	});
 
 	describe('Get Page operation', () => {
@@ -64,32 +85,27 @@ describe('Cosense Node', () => {
 			};
 
 			mockExecuteFunctions.getNodeParameter.mockReturnValueOnce(pageTitle); // pageTitle
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+			mockGetPage.mockResolvedValue(mockResponse);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-				method: 'GET',
-				url: `https://scrapbox.io/api/pages/test-project/${encodeURIComponent(pageTitle)}`,
-				json: true,
-				headers: {
-					Cookie: 'connect.sid=test-session-id',
-				},
-			});
-
+			expect(mockGetPage).toHaveBeenCalledWith(pageTitle);
 			expect(result).toEqual([[{
 				json: mockResponse,
 				pairedItem: { item: 0 },
 			}]]);
 		});
 
-		test('should handle 404 error for non-existent page', async () => {
+		test('should handle error for non-existent page', async () => {
 			const pageTitle = 'Non-existent Page';
-			const error = new Error('Not Found');
-			(error as any).response = { statusCode: 404 };
+			const error = new NodeApiError(
+				{ id: 'test-node-id', name: 'Cosense', type: 'cosense', typeVersion: 1, position: [0, 0], parameters: {} },
+				{},
+				{ message: `Page "${pageTitle}" not found` }
+			);
 
 			mockExecuteFunctions.getNodeParameter.mockReturnValueOnce(pageTitle);
-			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+			mockGetPage.mockRejectedValue(error);
 
 			await expect(cosenseNode.execute.call(mockExecuteFunctions)).rejects.toThrow(NodeApiError);
 		});
@@ -113,18 +129,11 @@ describe('Cosense Node', () => {
 			mockExecuteFunctions.getNodeParameter
 				.mockReturnValueOnce(limit) // limit
 				.mockReturnValueOnce(skip); // skip
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+			mockListPages.mockResolvedValue(mockResponse);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-				method: 'GET',
-				url: `https://scrapbox.io/api/pages/test-project?limit=${limit}&skip=${skip}`,
-				json: true,
-				headers: {
-					Cookie: 'connect.sid=test-session-id',
-				},
-			});
+			expect(mockListPages).toHaveBeenCalledWith(limit, skip);
 
 			expect(result).toEqual([[
 				{ json: mockResponse[0], pairedItem: { item: 0 } },
@@ -153,18 +162,11 @@ describe('Cosense Node', () => {
 				.mockReturnValueOnce(query) // query
 				.mockReturnValueOnce(searchType) // searchType
 				.mockReturnValueOnce(limit); // searchLimit
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+			mockSearchPages.mockResolvedValue(mockResponse);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-				method: 'GET',
-				url: `https://scrapbox.io/api/pages/test-project/search/titles?q=${encodeURIComponent(query)}`,
-				json: true,
-				headers: {
-					Cookie: 'connect.sid=test-session-id',
-				},
-			});
+			expect(mockSearchPages).toHaveBeenCalledWith(query, 'title', limit);
 
 			expect(result).toEqual([[
 				{ json: mockResponse[0], pairedItem: { item: 0 } },
@@ -184,22 +186,122 @@ describe('Cosense Node', () => {
 				.mockReturnValueOnce(query) // query
 				.mockReturnValueOnce(searchType) // searchType
 				.mockReturnValueOnce(limit); // searchLimit
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+			mockSearchPages.mockResolvedValue(mockResponse);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-				method: 'GET',
-				url: `https://scrapbox.io/api/pages/test-project/search/query?q=${encodeURIComponent(query)}&limit=${limit}`,
-				json: true,
-				headers: {
-					Cookie: 'connect.sid=test-session-id',
-				},
-			});
+			expect(mockSearchPages).toHaveBeenCalledWith(query, 'fulltext', limit);
 
 			expect(result).toEqual([[
 				{ json: mockResponse[0], pairedItem: { item: 0 } },
 			]]);
+		});
+	});
+
+	describe('Create Page operation', () => {
+		beforeEach(() => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce('create'); // operation
+		});
+
+		test('should create a page successfully', async () => {
+			const title = 'New Page';
+			const content = 'Line 1\nLine 2\nLine 3';
+			const mockResponse = {
+				title,
+				lines: ['Line 1', 'Line 2', 'Line 3'],
+				id: '123456',
+			};
+
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce(title) // createPageTitle
+				.mockReturnValueOnce(content); // content
+			mockCreatePage.mockResolvedValue(mockResponse);
+
+			const result = await cosenseNode.execute.call(mockExecuteFunctions);
+
+			expect(mockCreatePage).toHaveBeenCalledWith({
+				title,
+				lines: ['Line 1', 'Line 2', 'Line 3'],
+			});
+			expect(result).toEqual([[{
+				json: mockResponse,
+				pairedItem: { item: 0 },
+			}]]);
+		});
+
+		test('should add title as first line if content is empty', async () => {
+			const title = 'New Page';
+			const content = '';
+			const mockResponse = {
+				title,
+				lines: [title],
+			};
+
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce(title)
+				.mockReturnValueOnce(content);
+			mockCreatePage.mockResolvedValue(mockResponse);
+
+			await cosenseNode.execute.call(mockExecuteFunctions);
+
+			expect(mockCreatePage).toHaveBeenCalledWith({
+				title,
+				lines: [title],
+			});
+		});
+	});
+
+	describe('Insert Lines operation', () => {
+		beforeEach(() => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce('insertLines'); // operation
+		});
+
+		test('should insert lines successfully', async () => {
+			const pageTitle = 'Existing Page';
+			const lineNumber = 1;
+			const text = 'Inserted Line 1\nInserted Line 2';
+			const mockResponse = {
+				title: pageTitle,
+				lines: ['Original Line 1', 'Original Line 2', 'Inserted Line 1', 'Inserted Line 2', 'Original Line 3'],
+			};
+
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce(pageTitle) // insertPageTitle
+				.mockReturnValueOnce(lineNumber) // lineNumber
+				.mockReturnValueOnce(text); // insertText
+			mockInsertLines.mockResolvedValue(mockResponse);
+
+			const result = await cosenseNode.execute.call(mockExecuteFunctions);
+
+			expect(mockInsertLines).toHaveBeenCalledWith(pageTitle, { lineNumber, text });
+			expect(result).toEqual([[{
+				json: mockResponse,
+				pairedItem: { item: 0 },
+			}]]);
+		});
+
+		test('should handle insert at beginning (line 0)', async () => {
+			const pageTitle = 'Test Page';
+			const lineNumber = 0;
+			const text = 'First Line';
+			const mockResponse = {
+				title: pageTitle,
+				lines: ['First Line', 'Original Line 1'],
+			};
+
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce(pageTitle)
+				.mockReturnValueOnce(lineNumber)
+				.mockReturnValueOnce(text);
+			mockInsertLines.mockResolvedValue(mockResponse);
+
+			await cosenseNode.execute.call(mockExecuteFunctions);
+
+			expect(mockInsertLines).toHaveBeenCalledWith(pageTitle, { lineNumber, text });
 		});
 	});
 
@@ -214,26 +316,26 @@ describe('Cosense Node', () => {
 				.mockReturnValueOnce('get')
 				.mockReturnValueOnce('Public Page');
 
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({ title: 'Public Page' });
+			mockGetPage.mockResolvedValue({ title: 'Public Page' });
 
 			await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-				method: 'GET',
-				url: 'https://scrapbox.io/api/pages/test-project/Public%20Page',
-				json: true,
-			});
+			expect(mockGetPage).toHaveBeenCalledWith('Public Page');
 		});
 
-		test('should handle 401 authentication error', async () => {
-			const error = new Error('Unauthorized');
-			(error as any).response = { statusCode: 401 };
+		test('should handle authentication error', async () => {
+			const error = new NodeApiError(
+				{ id: 'test-node-id', name: 'Cosense', type: 'cosense', typeVersion: 1, position: [0, 0], parameters: {} },
+				{},
+				{ message: 'Authentication failed' }
+			);
 
 			mockExecuteFunctions.getNodeParameter
 				.mockReturnValueOnce('page')
-				.mockReturnValueOnce('get')
-				.mockReturnValueOnce('Private Page');
-			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+				.mockReturnValueOnce('create')
+				.mockReturnValueOnce('Private Page')
+				.mockReturnValueOnce('Content');
+			mockCreatePage.mockRejectedValue(error);
 
 			await expect(cosenseNode.execute.call(mockExecuteFunctions)).rejects.toThrow(NodeApiError);
 		});
@@ -248,7 +350,7 @@ describe('Cosense Node', () => {
 				.mockReturnValueOnce('Error Page');
 
 			const error = new Error('Some error');
-			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+			mockGetPage.mockRejectedValue(error);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
