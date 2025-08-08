@@ -1,19 +1,24 @@
 {
-  "name": "n8n-nodes-<...>",
+  "name": "n8n-nodes-cosense",
   "version": "0.1.0",
-  "description": "",
+  "description": "n8n node for Cosense (formerly Scrapbox) - read and manage pages",
   "keywords": [
-    "n8n-community-node-package"
+    "n8n-community-node-package",
+    "n8n",
+    "cosense",
+    "scrapbox",
+    "wiki",
+    "knowledge-base"
   ],
   "license": "MIT",
-  "homepage": "",
+  "homepage": "https://github.com/mtane0412/n8n-nodes-cosense",
   "author": {
-    "name": "",
-    "email": ""
+    "name": "mtane0412",
+    "email": "mtane0412@example.com"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/<...>/n8n-nodes-<...>.git"
+    "url": "https://github.com/mtane0412/n8n-nodes-cosense.git"
   },
   "engines": {
     "node": ">=20.15"
@@ -25,7 +30,9 @@
     "format": "prettier nodes credentials --write",
     "lint": "eslint nodes credentials package.json",
     "lintfix": "eslint nodes credentials package.json --fix",
-    "prepublishOnly": "npm run build && npm run lint -c .eslintrc.prepublish.js nodes credentials package.json"
+    "prepublishOnly": "npm run build && npm run lint -c .eslintrc.prepublish.js nodes credentials package.json",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "files": [
     "dist"
@@ -33,20 +40,21 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/ExampleCredentialsApi.credentials.js",
-      "dist/credentials/HttpBinApi.credentials.js"
+      "dist/credentials/CosenseApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/ExampleNode/ExampleNode.node.js",
-      "dist/nodes/HttpBin/HttpBin.node.js"
+      "dist/nodes/Cosense/Cosense.node.js"
     ]
   },
   "devDependencies": {
+    "@types/jest": "^29.5.11",
     "@typescript-eslint/parser": "~8.32.0",
     "eslint": "^8.57.0",
     "eslint-plugin-n8n-nodes-base": "^1.16.3",
     "gulp": "^5.0.0",
+    "jest": "^29.7.0",
     "prettier": "^3.5.3",
+    "ts-jest": "^29.1.1",
     "typescript": "^5.8.2"
   },
   "peerDependencies": {
