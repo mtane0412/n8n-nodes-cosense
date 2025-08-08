@@ -59,7 +59,7 @@ export class Cosense implements INodeType {
 					{
 						name: 'Create',
 						value: 'create',
-						description: 'Create a new page',
+						description: 'Create a new page or append to existing page',
 						action: 'Create a page',
 					},
 					{
@@ -152,7 +152,7 @@ export class Cosense implements INodeType {
 				},
 				default: '',
 				placeholder: 'New Page Title',
-				description: 'The title of the page to create',
+				description: 'The title of the page to create. If a page with this title already exists, content will be appended to the end of the page.',
 			},
 			{
 				displayName: 'Content',

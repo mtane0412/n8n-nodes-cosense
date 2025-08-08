@@ -203,23 +203,35 @@ export class CosenseApiClient {
 		}
 
 		try {
-			// WebSocketを使用してページを作成
+			// まず既存のページが存在するかチェック
+			let existingPage: PageData | null = null;
+			try {
+				existingPage = await this.getPage(data.title);
+			} catch (error: any) {
+				// 404エラーの場合はページが存在しないので、新規作成可能
+				if (error.response?.statusCode !== 404) {
+					throw error; // その他のエラーは再スロー
+				}
+			}
+
 			const wsClient = new CosenseWebSocketClient({ sessionId: this.sessionId });
 			const content = data.lines.slice(1).join('\n'); // 最初の行はタイトルなので除外
-			await wsClient.createPage(this.projectName, data.title, content);
+
+			if (existingPage) {
+				// 既存ページが存在する場合は末尾に追加
+				const lastLineNumber = existingPage.lines.length; // 最後の行の次の位置
+				await wsClient.insertLines(this.projectName, data.title, lastLineNumber, content);
+			} else {
+				// 新規ページ作成
+				await wsClient.createPage(this.projectName, data.title, content);
+			}
 			
-			// 作成後にページを取得して返す
+			// 作成/更新後にページを取得して返す
 			return await this.getPage(data.title);
 		} catch (error: any) {
-			if (error.message?.includes('already exists')) {
-				throw new NodeApiError(this.executeFunctions.getNode(), error, {
-					message: `Page "${data.title}" already exists in project "${this.projectName}"`,
-					description: 'A page with this title already exists. Please choose a different title or use the "Insert Lines" operation to update the existing page.',
-				});
-			}
 			throw new NodeApiError(this.executeFunctions.getNode(), error, {
-				message: 'Failed to create page',
-				description: error.message || 'An error occurred while creating the page',
+				message: 'Failed to create or update page',
+				description: error.message || 'An error occurred while creating or updating the page',
 			});
 		}
 	}
