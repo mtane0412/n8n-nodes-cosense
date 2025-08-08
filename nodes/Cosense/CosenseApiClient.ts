@@ -32,6 +32,31 @@ export interface InsertLinesData {
 	text: string;
 }
 
+export interface PageSnapshot {
+	id: string;
+	pageId: string;
+	created: number;
+	lines: string[];
+	[key: string]: any;
+}
+
+export interface PageCommit {
+	id: string;
+	pageId: string;
+	userId: string;
+	created: number;
+	message?: string;
+	[key: string]: any;
+}
+
+export interface ProjectBackup {
+	id: string;
+	created: number;
+	size?: number;
+	status?: string;
+	[key: string]: any;
+}
+
 export class CosenseApiClient {
 	private baseUrl = 'https://scrapbox.io/api';
 	private projectName: string;
@@ -719,5 +744,225 @@ export class CosenseApiClient {
 				});
 			}
 		}, `getProjectInfo(${targetProjectName})`);
+	}
+
+	// History and Snapshot Methods
+	async getPageSnapshots(pageId: string): Promise<PageSnapshot[]> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/page-snapshots/${this.projectName}/${pageId}`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as PageSnapshot[];
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Page with ID "${pageId}" not found`,
+						description: 'The requested page could not be found. Please verify the page ID.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get page snapshots',
+					description: error.message || 'An error occurred while fetching page snapshots',
+				});
+			}
+		}, `getPageSnapshots(${pageId})`);
+	}
+
+	async getPageSnapshotByTimestamp(pageId: string, timestampId: string): Promise<PageSnapshot> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/page-snapshots/${this.projectName}/${pageId}/${timestampId}`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as PageSnapshot;
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Snapshot not found for page ID "${pageId}" at timestamp "${timestampId}"`,
+						description: 'The requested snapshot could not be found. Please verify the page ID and timestamp.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get page snapshot',
+					description: error.message || 'An error occurred while fetching page snapshot',
+				});
+			}
+		}, `getPageSnapshotByTimestamp(${pageId}, ${timestampId})`);
+	}
+
+	async getPageCommits(pageId: string): Promise<PageCommit[]> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/commits/${this.projectName}/${pageId}`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as PageCommit[];
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Page with ID "${pageId}" not found`,
+						description: 'The requested page could not be found. Please verify the page ID.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get page commits',
+					description: error.message || 'An error occurred while fetching page commits',
+				});
+			}
+		}, `getPageCommits(${pageId})`);
+	}
+
+	// Helper method to get page ID from page title
+	async getPageIdByTitle(pageTitle: string): Promise<string> {
+		const page = await this.getPage(pageTitle);
+		if (!page.id) {
+			throw new NodeApiError(this.executeFunctions.getNode(), {}, {
+				message: `Page ID not found for page "${pageTitle}"`,
+				description: 'The page exists but does not have an ID. This might be a temporary issue.',
+			});
+		}
+		return page.id as string;
+	}
+
+	// Backup Methods
+	async getProjectBackupList(): Promise<ProjectBackup[]> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/project-backup/${this.projectName}/list`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as ProjectBackup[];
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get project backup list',
+					description: error.message || 'An error occurred while fetching project backup list',
+				});
+			}
+		}, 'getProjectBackupList');
+	}
+
+	async getProjectBackup(backupId: string): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/project-backup/${this.projectName}/${backupId}.json`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Backup with ID "${backupId}" not found`,
+						description: 'The requested backup could not be found. Please verify the backup ID.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get project backup',
+					description: error.message || 'An error occurred while fetching project backup',
+				});
+			}
+		}, `getProjectBackup(${backupId})`);
+	}
+
+	// Stream and Feed Methods
+	async getProjectStream(): Promise<JsonObject[]> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/stream/${this.projectName}/`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject[];
+			} catch (error: any) {
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get project stream',
+					description: error.message || 'An error occurred while fetching project stream',
+				});
+			}
+		}, 'getProjectStream');
+	}
+
+	async getPageIcon(pageTitle: string): Promise<JsonObject> {
+		const options = this.getRequestOptions();
+		options.url = `${this.baseUrl}/pages/${this.projectName}/${encodeURIComponent(pageTitle)}/icon`;
+
+		return this.executeWithRetry(async () => {
+			try {
+				const response = await this.executeFunctions.helpers.httpRequest(options);
+				return response as JsonObject;
+			} catch (error: any) {
+				if (error.response?.statusCode === 404) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: `Icon not found for page "${pageTitle}"`,
+						description: 'The page might not have an icon or the page does not exist.',
+					});
+				}
+				if (error.response?.statusCode === 401) {
+					throw new NodeApiError(this.executeFunctions.getNode(), error, {
+						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
+						description: this.authenticationType === 'serviceAccount' 
+							? 'Please verify your Service Account Access Key is valid and has access to this project.'
+							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
+					});
+				}
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: 'Failed to get page icon',
+					description: error.message || 'An error occurred while fetching page icon',
+				});
+			}
+		}, `getPageIcon(${pageTitle})`);
 	}
 }

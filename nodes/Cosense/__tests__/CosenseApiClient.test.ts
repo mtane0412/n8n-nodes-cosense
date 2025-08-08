@@ -455,4 +455,320 @@ describe('CosenseApiClient', () => {
 				.rejects.toThrow('Table "nonexistent" not found in page "Page"');
 		});
 	});
+
+	describe('getPageIdByTitle', () => {
+		it('should get page ID from page title', async () => {
+			const mockPage = {
+				id: 'page123',
+				title: 'Test Page',
+				lines: ['Test Page', 'content'],
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockPage);
+
+			const result = await apiClient.getPageIdByTitle('Test Page');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/pages/test-project/Test%20Page',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toBe('page123');
+		});
+
+		it('should throw error if page has no ID', async () => {
+			const mockPage = {
+				title: 'Test Page',
+				lines: ['Test Page', 'content'],
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockPage);
+
+			await expect(apiClient.getPageIdByTitle('Test Page'))
+				.rejects.toThrow('Page ID not found for page "Test Page"');
+		});
+	});
+
+	describe('getPageSnapshots', () => {
+		it('should get page snapshots', async () => {
+			const mockSnapshots = [
+				{
+					id: 'snap1',
+					pageId: 'page123',
+					created: 1234567890,
+					lines: ['content1'],
+				},
+				{
+					id: 'snap2',
+					pageId: 'page123',
+					created: 1234567900,
+					lines: ['content2'],
+				},
+			];
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockSnapshots);
+
+			const result = await apiClient.getPageSnapshots('page123');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/page-snapshots/test-project/page123',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockSnapshots);
+		});
+
+		it('should handle 404 error for non-existent page', async () => {
+			const error = new Error('Not Found');
+			(error as any).response = { statusCode: 404 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getPageSnapshots('nonexistent'))
+				.rejects.toThrow('Page with ID "nonexistent" not found');
+		});
+	});
+
+	describe('getPageSnapshotByTimestamp', () => {
+		it('should get specific page snapshot', async () => {
+			const mockSnapshot = {
+				id: 'snap1',
+				pageId: 'page123',
+				created: 1234567890,
+				lines: ['content at timestamp'],
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockSnapshot);
+
+			const result = await apiClient.getPageSnapshotByTimestamp('page123', 'timestamp123');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/page-snapshots/test-project/page123/timestamp123',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockSnapshot);
+		});
+
+		it('should handle 404 error for non-existent snapshot', async () => {
+			const error = new Error('Not Found');
+			(error as any).response = { statusCode: 404 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getPageSnapshotByTimestamp('page123', 'nonexistent'))
+				.rejects.toThrow('Snapshot not found for page ID "page123" at timestamp "nonexistent"');
+		});
+	});
+
+	describe('getPageCommits', () => {
+		it('should get page commits', async () => {
+			const mockCommits = [
+				{
+					id: 'commit1',
+					pageId: 'page123',
+					userId: 'user1',
+					created: 1234567890,
+					message: 'Initial commit',
+				},
+				{
+					id: 'commit2',
+					pageId: 'page123',
+					userId: 'user2',
+					created: 1234567900,
+					message: 'Update content',
+				},
+			];
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockCommits);
+
+			const result = await apiClient.getPageCommits('page123');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/commits/test-project/page123',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockCommits);
+		});
+
+		it('should handle 404 error for non-existent page', async () => {
+			const error = new Error('Not Found');
+			(error as any).response = { statusCode: 404 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getPageCommits('nonexistent'))
+				.rejects.toThrow('Page with ID "nonexistent" not found');
+		});
+
+		it('should work with service account authentication', async () => {
+			const mockCommits = [{ id: 'commit1', pageId: 'page123' }];
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockCommits);
+
+			const result = await serviceAccountApiClient.getPageCommits('page123');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/commits/test-project/page123',
+				json: true,
+				headers: {
+					'x-service-account-access-key': 'test-service-account-key',
+				},
+			});
+			expect(result).toEqual(mockCommits);
+		});
+	});
+
+	describe('getProjectBackupList', () => {
+		it('should get project backup list', async () => {
+			const mockBackups = [
+				{
+					id: 'backup1',
+					created: 1234567890,
+					size: 1048576,
+					status: 'completed',
+				},
+				{
+					id: 'backup2',
+					created: 1234567900,
+					size: 2097152,
+					status: 'completed',
+				},
+			];
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockBackups);
+
+			const result = await apiClient.getProjectBackupList();
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/project-backup/test-project/list',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockBackups);
+		});
+
+		it('should handle authentication error', async () => {
+			const error = new Error('Unauthorized');
+			(error as any).response = { statusCode: 401 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getProjectBackupList())
+				.rejects.toThrow('Authentication failed');
+		});
+	});
+
+	describe('getProjectBackup', () => {
+		it('should get specific project backup', async () => {
+			const mockBackup = {
+				id: 'backup1',
+				created: 1234567890,
+				pages: [
+					{ title: 'Page 1', lines: ['content'] },
+					{ title: 'Page 2', lines: ['content'] },
+				],
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockBackup);
+
+			const result = await apiClient.getProjectBackup('backup1');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/project-backup/test-project/backup1.json',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockBackup);
+		});
+
+		it('should handle 404 error for non-existent backup', async () => {
+			const error = new Error('Not Found');
+			(error as any).response = { statusCode: 404 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getProjectBackup('nonexistent'))
+				.rejects.toThrow('Backup with ID "nonexistent" not found');
+		});
+	});
+
+	describe('getProjectStream', () => {
+		it('should get project stream', async () => {
+			const mockStream = [
+				{
+					type: 'page-update',
+					pageId: 'page123',
+					userId: 'user1',
+					timestamp: 1234567890,
+				},
+				{
+					type: 'page-create',
+					pageId: 'page124',
+					userId: 'user2',
+					timestamp: 1234567900,
+				},
+			];
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockStream);
+
+			const result = await apiClient.getProjectStream();
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/stream/test-project/',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockStream);
+		});
+	});
+
+	describe('getPageIcon', () => {
+		it('should get page icon', async () => {
+			const mockIcon = {
+				url: 'https://example.com/icon.png',
+				type: 'image/png',
+			};
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockIcon);
+
+			const result = await apiClient.getPageIcon('Page With Icon');
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://scrapbox.io/api/pages/test-project/Page%20With%20Icon/icon',
+				json: true,
+				headers: {
+					Cookie: 'connect.sid=test-session',
+				},
+			});
+			expect(result).toEqual(mockIcon);
+		});
+
+		it('should handle 404 error for page without icon', async () => {
+			const error = new Error('Not Found');
+			(error as any).response = { statusCode: 404 };
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+
+			await expect(apiClient.getPageIcon('Page Without Icon'))
+				.rejects.toThrow('Icon not found for page "Page Without Icon"');
+		});
+	});
 });

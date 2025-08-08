@@ -7,9 +7,13 @@
 #### ページ情報API
 - ✅ GET `/api/pages/:projectname/:pagetitle` - ページ取得
 - ✅ GET `/api/pages/:projectname/:pagetitle/text` - ページテキスト取得（getPageで統合）
+- ✅ GET `/api/pages/:projectname/:pagetitle/icon` - ページアイコンの取得（2025-08-08実装）
 - ✅ GET `/api/pages/:projectname/search/titles` - タイトル検索
 - ✅ GET `/api/code/:projectname/:pagetitle/:filename` - コードブロック取得（getCodeBlocksとして実装）
 - ✅ GET `/api/table/:projectname/:pagetitle/:filename.csv` - テーブルデータのCSV形式での取得（2025-08-08実装）
+- ✅ GET `/api/page-snapshots/:projectname/:pageid` - ページスナップショット一覧の取得（2025-08-08実装）
+- ✅ GET `/api/page-snapshots/:projectname/:pageid/:timestampid` - 特定スナップショットの取得（2025-08-08実装）
+- ✅ GET `/api/commits/:projectname/:pageid` - ページのコミット履歴取得（2025-08-08実装）
 
 #### 検索API
 - ✅ GET `/api/pages/:projectname/search/query` - フルテキスト検索
@@ -17,6 +21,9 @@
 #### プロジェクト情報API
 - ✅ GET `/api/pages/:projectname` - プロジェクト内のページ一覧
 - ✅ GET `/api/projects/:projectname` - プロジェクト詳細情報の取得（2025-08-08実装）
+- ✅ GET `/api/stream/:projectname/` - プロジェクトストリーム（更新情報）の取得（2025-08-08実装）
+- ✅ GET `/api/project-backup/:projectname/list` - バックアップ一覧の取得（2025-08-08実装）
+- ✅ GET `/api/project-backup/:projectname/:backupId.json` - 特定バックアップの取得（2025-08-08実装）
 
 #### ユーザー情報API
 - ✅ GET `/api/users/me` - 現在のユーザー情報取得（2025-08-08実装）
@@ -32,26 +39,7 @@
 ## 未実装のAPI
 
 ### ページ情報API
-1. **GET `/api/pages/:projectname/:pagetitle/icon`**
-   - ページアイコンの取得
-   - 実装優先度: 中
-
-
-3. **GET `/api/page-snapshots/:projectname/:pageid`**
-   - ページスナップショット一覧の取得
-   - 実装優先度: 中
-   - 注意: page IDが必要（現在の実装はtitleベース）
-
-4. **GET `/api/page-snapshots/:projectname/:pageid/:timestampid`**
-   - 特定スナップショットの取得
-   - 実装優先度: 中
-   - 注意: 現在getSnapshotとして部分実装あり、改善が必要
-
-5. **GET `/api/commits/:projectname/:pageid`**
-   - ページのコミット履歴取得
-   - 実装優先度: 中
-
-6. **GET `/api/deleted-pages/:projectname/:pageid`**
+1. **GET `/api/deleted-pages/:projectname/:pageid`**
    - 削除されたページの情報取得
    - 実装優先度: 低
 
@@ -65,29 +53,17 @@
    - 実装優先度: 低
 
 ### プロジェクト情報API
-1. **GET `/api/stream/:projectname/`**
-   - プロジェクトストリーム（更新情報）の取得
-   - 実装優先度: 中
-
-2. **GET `/api/feed/:projectname`**
+1. **GET `/api/feed/:projectname`**
    - プロジェクトフィードの取得
    - 実装優先度: 低
 
-3. **GET `/api/projects/:projectname/notifications`**
+2. **GET `/api/projects/:projectname/notifications`**
    - 通知情報の取得
    - 実装優先度: 低
 
-4. **GET `/api/projects/:projectname/invitations`**
+3. **GET `/api/projects/:projectname/invitations`**
    - 招待情報の取得
    - 実装優先度: 低
-
-5. **GET `/api/project-backup/:projectname/list`**
-   - バックアップ一覧の取得
-   - 実装優先度: 中
-
-6. **GET `/api/project-backup/:projectname/:backupId.json`**
-   - 特定バックアップの取得
-   - 実装優先度: 中
 
 ### ユーザー情報API
 1. **GET `/api/gcs/:projectname/usage`**
@@ -126,19 +102,26 @@
    - すべての新機能のユニットテストを作成
    - Lintチェックとビルドの成功を確認
 
-### フェーズ2: 中優先度API（2週目）
+### フェーズ2: 中優先度API（2週目）✅ 完了（2025-08-08）
 1. **履歴・スナップショットAPI**
-   - GET `/api/page-snapshots/:projectname/:pageid`
-   - GET `/api/commits/:projectname/:pageid`
-   - 既存のgetSnapshot/getTimestampIdsの改善
+   - ✅ GET `/api/page-snapshots/:projectname/:pageid` - getPageSnapshots()として実装
+   - ✅ GET `/api/commits/:projectname/:pageid` - getPageCommits()として実装
+   - ✅ GET `/api/page-snapshots/:projectname/:pageid/:timestampid` - getPageSnapshotByTimestamp()として実装
 
 2. **バックアップAPI**
-   - GET `/api/project-backup/:projectname/list`
-   - GET `/api/project-backup/:projectname/:backupId.json`
+   - ✅ GET `/api/project-backup/:projectname/list` - getProjectBackupList()として実装
+   - ✅ GET `/api/project-backup/:projectname/:backupId.json` - getProjectBackup()として実装
 
 3. **その他の情報API**
-   - GET `/api/pages/:projectname/:pagetitle/icon`
-   - GET `/api/stream/:projectname/`
+   - ✅ GET `/api/pages/:projectname/:pagetitle/icon` - getPageIcon()として実装
+   - ✅ GET `/api/stream/:projectname/` - getProjectStream()として実装
+
+4. **実装内容**
+   - CosenseApiClientに7つの新しいAPIメソッドを追加
+   - Pageリソースに新しい操作を追加（Get Snapshots, Get Snapshot, Get Commits, Get Icon）
+   - Projectリソースに新しい操作を追加（Get Backup List, Get Backup, Get Stream）
+   - すべての新機能のユニットテストを作成
+   - Lintチェックとビルドの成功を確認
 
 ### フェーズ3: 低優先度API（3週目）
 1. **通知・招待API**

@@ -361,4 +361,86 @@ describe('Cosense Node', () => {
 			}]]);
 		});
 	});
+
+	describe('History operations', () => {
+		test('should get page snapshots', async () => {
+			const pageTitle = 'History Page';
+			const pageId = 'page123';
+			const mockSnapshots = [
+				{ id: 'snap1', created: 1234567890 },
+				{ id: 'snap2', created: 1234567900 },
+			];
+
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('page')
+				.mockReturnValueOnce('getSnapshots')
+				.mockReturnValueOnce(pageTitle);
+
+			const mockGetPageIdByTitle = jest.fn().mockResolvedValue(pageId);
+			const mockGetPageSnapshots = jest.fn().mockResolvedValue(mockSnapshots);
+			(CosenseApiClient as any).mockImplementation(() => ({
+				getPageIdByTitle: mockGetPageIdByTitle,
+				getPageSnapshots: mockGetPageSnapshots,
+			}));
+
+			await cosenseNode.execute.call(mockExecuteFunctions);
+
+			expect(mockGetPageIdByTitle).toHaveBeenCalledWith(pageTitle);
+			expect(mockGetPageSnapshots).toHaveBeenCalledWith(pageId);
+			expect(mockExecuteFunctions.helpers.returnJsonArray).toHaveBeenCalledWith(mockSnapshots);
+		});
+
+		test('should get specific page snapshot', async () => {
+			const pageTitle = 'History Page';
+			const pageId = 'page123';
+			const timestampId = 'timestamp123';
+			const mockSnapshot = { id: 'snap1', lines: ['content'] };
+
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('page')
+				.mockReturnValueOnce('getSnapshot')
+				.mockReturnValueOnce(pageTitle)
+				.mockReturnValueOnce(timestampId);
+
+			const mockGetPageIdByTitle = jest.fn().mockResolvedValue(pageId);
+			const mockGetPageSnapshotByTimestamp = jest.fn().mockResolvedValue(mockSnapshot);
+			(CosenseApiClient as any).mockImplementation(() => ({
+				getPageIdByTitle: mockGetPageIdByTitle,
+				getPageSnapshotByTimestamp: mockGetPageSnapshotByTimestamp,
+			}));
+
+			await cosenseNode.execute.call(mockExecuteFunctions);
+
+			expect(mockGetPageIdByTitle).toHaveBeenCalledWith(pageTitle);
+			expect(mockGetPageSnapshotByTimestamp).toHaveBeenCalledWith(pageId, timestampId);
+			expect(mockExecuteFunctions.helpers.returnJsonArray).toHaveBeenCalledWith(mockSnapshot);
+		});
+
+		test('should get page commits', async () => {
+			const pageTitle = 'History Page';
+			const pageId = 'page123';
+			const mockCommits = [
+				{ id: 'commit1', message: 'First commit' },
+				{ id: 'commit2', message: 'Second commit' },
+			];
+
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('page')
+				.mockReturnValueOnce('getCommits')
+				.mockReturnValueOnce(pageTitle);
+
+			const mockGetPageIdByTitle = jest.fn().mockResolvedValue(pageId);
+			const mockGetPageCommits = jest.fn().mockResolvedValue(mockCommits);
+			(CosenseApiClient as any).mockImplementation(() => ({
+				getPageIdByTitle: mockGetPageIdByTitle,
+				getPageCommits: mockGetPageCommits,
+			}));
+
+			await cosenseNode.execute.call(mockExecuteFunctions);
+
+			expect(mockGetPageIdByTitle).toHaveBeenCalledWith(pageTitle);
+			expect(mockGetPageCommits).toHaveBeenCalledWith(pageId);
+			expect(mockExecuteFunctions.helpers.returnJsonArray).toHaveBeenCalledWith(mockCommits);
+		});
+	});
 });

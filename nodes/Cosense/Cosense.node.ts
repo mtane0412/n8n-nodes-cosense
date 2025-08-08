@@ -101,6 +101,30 @@ export class Cosense implements INodeType {
 						action: 'Get code blocks from page',
 					},
 					{
+						name: 'Get Commits',
+						value: 'getCommits',
+						description: 'Get commit history for a page',
+						action: 'Get page commits',
+					},
+					{
+						name: 'Get Icon',
+						value: 'getIcon',
+						description: 'Get page icon',
+						action: 'Get page icon',
+					},
+					{
+						name: 'Get Snapshot',
+						value: 'getSnapshot',
+						description: 'Get a specific snapshot for a page',
+						action: 'Get page snapshot',
+					},
+					{
+						name: 'Get Snapshots',
+						value: 'getSnapshots',
+						description: 'Get all snapshots for a page',
+						action: 'Get page snapshots',
+					},
+					{
 						name: 'Get Table',
 						value: 'getTable',
 						description: 'Get table data from a page as CSV',
@@ -136,7 +160,7 @@ export class Cosense implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['page'],
-						operation: ['get', 'getCodeBlocks', 'getTable'],
+						operation: ['get', 'getCodeBlocks', 'getTable', 'getSnapshots', 'getSnapshot', 'getCommits', 'getIcon'],
 					},
 				},
 				default: '',
@@ -333,6 +357,22 @@ export class Cosense implements INodeType {
 				default: 50,
 				description: 'Maximum number of search results to return',
 			},
+			// Get Snapshot
+			{
+				displayName: 'Timestamp ID',
+				name: 'timestampId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['page'],
+						operation: ['getSnapshot'],
+					},
+				},
+				default: '',
+				placeholder: '5f1234567890abcdef123456',
+				description: 'The timestamp ID of the snapshot to retrieve',
+			},
 			// Project Operations
 			{
 				displayName: 'Operation',
@@ -352,10 +392,28 @@ export class Cosense implements INodeType {
 						action: 'Export pages from project',
 					},
 					{
+						name: 'Get Backup',
+						value: 'getBackup',
+						description: 'Get a specific project backup',
+						action: 'Get project backup',
+					},
+					{
+						name: 'Get Backup List',
+						value: 'getBackupList',
+						description: 'Get list of project backups',
+						action: 'Get project backup list',
+					},
+					{
 						name: 'Get Info',
 						value: 'getInfo',
 						description: 'Get project information',
 						action: 'Get project information',
+					},
+					{
+						name: 'Get Stream',
+						value: 'getStream',
+						description: 'Get project stream (updates)',
+						action: 'Get project stream',
 					},
 					{
 						name: 'Import Pages',
@@ -532,6 +590,22 @@ export class Cosense implements INodeType {
 				placeholder: 'project-name',
 				description: 'Name of the project to get info for. Leave empty to use the project from credentials.',
 			},
+			// Backup ID (for Get Backup)
+			{
+				displayName: 'Backup ID',
+				name: 'backupId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['project'],
+						projectOperation: ['getBackup'],
+					},
+				},
+				default: '',
+				placeholder: '5f1234567890abcdef123456',
+				description: 'The ID of the backup to retrieve',
+			},
 			// Import Pages Parameters
 			{
 				displayName: 'Pages Data',
@@ -648,6 +722,22 @@ export class Cosense implements INodeType {
 						const lineNumber = this.getNodeParameter('lineNumber', i) as number;
 						const text = this.getNodeParameter('insertText', i) as string;
 						responseData = await apiClient.insertLines(pageTitle, { lineNumber, text });
+					} else if (operation === 'getSnapshots') {
+						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
+						const pageId = await apiClient.getPageIdByTitle(pageTitle);
+						responseData = await apiClient.getPageSnapshots(pageId);
+					} else if (operation === 'getSnapshot') {
+						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
+						const timestampId = this.getNodeParameter('timestampId', i) as string;
+						const pageId = await apiClient.getPageIdByTitle(pageTitle);
+						responseData = await apiClient.getPageSnapshotByTimestamp(pageId, timestampId);
+					} else if (operation === 'getCommits') {
+						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
+						const pageId = await apiClient.getPageIdByTitle(pageTitle);
+						responseData = await apiClient.getPageCommits(pageId);
+					} else if (operation === 'getIcon') {
+						const pageTitle = this.getNodeParameter('pageTitle', i) as string;
+						responseData = await apiClient.getPageIcon(pageTitle);
 					}
 				} else if (resource === 'project') {
 					const operation = this.getNodeParameter('projectOperation', i) as string;
@@ -660,6 +750,13 @@ export class Cosense implements INodeType {
 						const pagesData = this.getNodeParameter('pagesData', i) as string;
 						const pages = JSON.parse(pagesData) as JsonObject[];
 						responseData = await apiClient.importPages(pages);
+					} else if (operation === 'getBackupList') {
+						responseData = await apiClient.getProjectBackupList();
+					} else if (operation === 'getBackup') {
+						const backupId = this.getNodeParameter('backupId', i) as string;
+						responseData = await apiClient.getProjectBackup(backupId);
+					} else if (operation === 'getStream') {
+						responseData = await apiClient.getProjectStream();
 					}
 				} else if (resource === 'user') {
 					const operation = this.getNodeParameter('userOperation', i) as string;
