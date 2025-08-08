@@ -18,7 +18,7 @@ export class Cosense implements INodeType {
 		icon: 'file:cosense.svg',
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{($parameter["resource"] === "page" ? $parameter["operation"] : $parameter["resource"] === "project" ? $parameter["projectOperation"] : $parameter["resource"] === "history" ? $parameter["historyOperation"] : $parameter["resource"] === "exportImport" ? $parameter["exportImportOperation"] : $parameter["resource"] === "user" ? $parameter["userOperation"] : $parameter["externalOperation"]) + ": " + $parameter["resource"]}}',
+		subtitle: '={{($parameter["resource"] === "page" ? $parameter["operation"] : $parameter["resource"] === "project" ? $parameter["projectOperation"] : $parameter["resource"] === "history" ? $parameter["historyOperation"] : $parameter["resource"] === "exportImport" ? $parameter["exportImportOperation"] : $parameter["userOperation"]) + ": " + $parameter["resource"]}}',
 		description: 'Read and write pages in Cosense (formerly Scrapbox)',
 		defaults: {
 			name: 'Cosense',
@@ -42,11 +42,6 @@ export class Cosense implements INodeType {
 						name: 'Export/Import',
 						value: 'exportImport',
 						description: 'Export or import project data',
-					},
-					{
-						name: 'External',
-						value: 'external',
-						description: 'External service integrations',
 					},
 					{
 						name: 'History',
@@ -584,45 +579,6 @@ export class Cosense implements INodeType {
 				],
 				default: 'exportProject',
 			},
-			// External Operations
-			{
-				displayName: 'Operation',
-				name: 'externalOperation',
-				type: 'options',
-				noDataExpression: true,
-				displayOptions: {
-					show: {
-						resource: ['external'],
-					},
-				},
-				options: [
-					{
-						name: 'Get CSRF Token',
-						value: 'getCSRFToken',
-						description: 'Get CSRF token for secure requests',
-						action: 'Get CSRF token',
-					},
-					{
-						name: 'Get Gyazo Token',
-						value: 'getGyazoToken',
-						description: 'Get OAuth token for Gyazo uploads',
-						action: 'Get Gyazo token',
-					},
-					{
-						name: 'Get Tweet Info',
-						value: 'getTweetInfo',
-						description: 'Get information about a tweet',
-						action: 'Get tweet information',
-					},
-					{
-						name: 'Get Web Page Title',
-						value: 'getWebPageTitle',
-						description: 'Get title of a web page',
-						action: 'Get web page title',
-					},
-				],
-				default: 'getCSRFToken',
-			},
 			// History - Get Snapshot Parameters
 			{
 				displayName: 'Project Name',
@@ -776,38 +732,6 @@ export class Cosense implements INodeType {
 				},
 				default: '{}',
 				description: 'Complete project data to import',
-			},
-			// External - Tweet Info Parameters
-			{
-				displayName: 'Tweet URL',
-				name: 'tweetUrl',
-				type: 'string',
-				required: true,
-				displayOptions: {
-					show: {
-						resource: ['external'],
-						externalOperation: ['getTweetInfo'],
-					},
-				},
-				default: '',
-				placeholder: 'https://twitter.com/user/status/1234567890',
-				description: 'The URL of the tweet to get information for',
-			},
-			// External - Web Page Title Parameters
-			{
-				displayName: 'URL',
-				name: 'webPageUrl',
-				type: 'string',
-				required: true,
-				displayOptions: {
-					show: {
-						resource: ['external'],
-						externalOperation: ['getWebPageTitle'],
-					},
-				},
-				default: '',
-				placeholder: 'https://example.com',
-				description: 'The URL of the web page to get the title for',
 			},
 		],
 	};
