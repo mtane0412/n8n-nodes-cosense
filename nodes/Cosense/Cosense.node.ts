@@ -313,9 +313,10 @@ export class Cosense implements INodeType {
 					} else if (operation === 'create') {
 						const title = this.getNodeParameter('createPageTitle', i) as string;
 						const content = this.getNodeParameter('content', i) as string;
-						let lines = content.split('\n');
-						if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) {
-							lines = [title]; // タイトルを最初の行に設定
+						// タイトルを最初の行として、その後にコンテンツを追加
+						const lines = [title];
+						if (content && content.trim()) {
+							lines.push(...content.split('\n'));
 						}
 						responseData = await apiClient.createPage({ title, lines });
 					} else if (operation === 'insertLines') {

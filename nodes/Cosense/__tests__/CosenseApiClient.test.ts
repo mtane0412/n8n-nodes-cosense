@@ -5,6 +5,9 @@ import { CosenseApiClient } from '../CosenseApiClient';
 import type { INode } from 'n8n-workflow';
 import { NodeApiError } from 'n8n-workflow';
 
+// WebSocketクライアントをモック
+jest.mock('../CosenseWebSocketClient');
+
 describe('CosenseApiClient', () => {
 	let mockExecuteFunctions: any;
 	let mockNode: INode;
@@ -68,31 +71,30 @@ describe('CosenseApiClient', () => {
 
 	describe('createPage', () => {
 		it('should create a page successfully', async () => {
-			const mockResponse = {
+			const mockPageResponse = {
 				title: 'New Page',
-				lines: ['Title', 'Content'],
+				lines: ['New Page', 'Title', 'Content'],
 				id: '456',
 			};
 
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+			// WebSocket実装では、作成後にページを取得するため
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockPageResponse);
 
 			const result = await apiClient.createPage({
 				title: 'New Page',
 				lines: ['Title', 'Content'],
 			});
 
+			// ページ取得のみが呼ばれることを確認
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-				method: 'POST',
+				method: 'GET',
 				url: 'https://scrapbox.io/api/pages/test-project/New%20Page',
 				json: true,
 				headers: {
 					Cookie: 'connect.sid=test-session',
 				},
-				body: {
-					lines: ['Title', 'Content'],
-				},
 			});
-			expect(result).toEqual(mockResponse);
+			expect(result).toEqual(mockPageResponse);
 		});
 
 		it('should throw error when no session ID', async () => {
@@ -111,66 +113,53 @@ describe('CosenseApiClient', () => {
 
 	describe('insertLines', () => {
 		it('should insert lines successfully', async () => {
-			const existingPage = {
-				title: 'Test Page',
-				lines: ['Line 1', 'Line 2', 'Line 3'],
-			};
-
 			const updatedPage = {
 				title: 'Test Page',
 				lines: ['Line 1', 'Inserted Line', 'Line 2', 'Line 3'],
 			};
 
-			mockExecuteFunctions.helpers.httpRequest
-				.mockResolvedValueOnce(existingPage)
-				.mockResolvedValueOnce(updatedPage);
+			// WebSocket実装では、最後にページを取得するため
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(updatedPage);
 
 			const result = await apiClient.insertLines('Test Page', {
 				lineNumber: 0,
 				text: 'Inserted Line',
 			});
 
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledTimes(2);
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenNthCalledWith(2, {
-				method: 'POST',
+			// ページ取得のみが呼ばれることを確認
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
 				url: 'https://scrapbox.io/api/pages/test-project/Test%20Page',
 				json: true,
 				headers: {
 					Cookie: 'connect.sid=test-session',
-				},
-				body: {
-					lines: ['Line 1', 'Inserted Line', 'Line 2', 'Line 3'],
 				},
 			});
 			expect(result).toEqual(updatedPage);
 		});
 
 		it('should handle multi-line insert', async () => {
-			const existingPage = {
+			const updatedPage = {
 				title: 'Test Page',
-				lines: ['Line 1'],
+				lines: ['Line A', 'Line B', 'Line C', 'Line 1'],
 			};
 
-			mockExecuteFunctions.helpers.httpRequest
-				.mockResolvedValueOnce(existingPage)
-				.mockResolvedValueOnce({});
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(updatedPage);
 
-			await apiClient.insertLines('Test Page', {
+			const result = await apiClient.insertLines('Test Page', {
 				lineNumber: 0,
 				text: 'Line A\nLine B\nLine C',
 			});
 
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenNthCalledWith(2, {
-				method: 'POST',
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
 				url: 'https://scrapbox.io/api/pages/test-project/Test%20Page',
 				json: true,
 				headers: {
 					Cookie: 'connect.sid=test-session',
 				},
-				body: {
-					lines: ['Line 1', 'Line A', 'Line B', 'Line C'],
-				},
 			});
+			expect(result).toEqual(updatedPage);
 		});
 	});
 

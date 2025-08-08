@@ -62,5 +62,9 @@
   },
   "peerDependencies": {
     "n8n-workflow": "*"
+  },
+  "dependencies": {
+    "@cosense/std": "npm:@jsr/cosense__std@^0.29.14",
+    "@cosense/types": "npm:@jsr/cosense__types@^0.10.10"
   }
 }

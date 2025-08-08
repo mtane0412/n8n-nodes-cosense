@@ -14,4 +14,13 @@ module.exports = {
   moduleNameMapper: {
     '^n8n-workflow$': '<rootDir>/node_modules/n8n-workflow',
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(@cosense))',
+  ],
+  extensionsToTreatAsEsm: ['.ts'],
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
+      useESM: true,
+    }],
+  },
 };

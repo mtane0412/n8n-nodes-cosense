@@ -3,6 +3,7 @@
  */
 import type { IExecuteFunctions, IHttpRequestOptions, JsonObject } from 'n8n-workflow';
 import { NodeApiError } from 'n8n-workflow';
+import { CosenseWebSocketClient } from './CosenseWebSocketClient';
 
 export interface CosenseCredentials {
 	projectName: string;
@@ -201,34 +202,26 @@ export class CosenseApiClient {
 			});
 		}
 
-		const options = this.getRequestOptions('POST');
-		options.url = `${this.baseUrl}/pages/${this.projectName}/${encodeURIComponent(data.title)}`;
-		options.body = {
-			lines: data.lines,
-		};
-
-		return this.executeWithRetry(async () => {
-			try {
-				const response = await this.executeFunctions.helpers.httpRequest(options);
-				return response as PageData;
-			} catch (error: any) {
-				if (error.response?.statusCode === 401) {
-					throw new NodeApiError(this.executeFunctions.getNode(), error, {
-						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
-						description: this.authenticationType === 'serviceAccount' 
-							? 'Please verify your Service Account Access Key is valid and has access to this project.'
-							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
-					});
-				}
-				if (error.response?.statusCode === 409) {
-					throw new NodeApiError(this.executeFunctions.getNode(), error, {
-						message: `Page "${data.title}" already exists in project "${this.projectName}"`,
-						description: 'A page with this title already exists. Please choose a different title or use the "Insert Lines" operation to update the existing page.',
-					});
-				}
-				throw error;
+		try {
+			// WebSocketを使用してページを作成
+			const wsClient = new CosenseWebSocketClient({ sessionId: this.sessionId });
+			const content = data.lines.slice(1).join('\n'); // 最初の行はタイトルなので除外
+			await wsClient.createPage(this.projectName, data.title, content);
+			
+			// 作成後にページを取得して返す
+			return await this.getPage(data.title);
+		} catch (error: any) {
+			if (error.message?.includes('already exists')) {
+				throw new NodeApiError(this.executeFunctions.getNode(), error, {
+					message: `Page "${data.title}" already exists in project "${this.projectName}"`,
+					description: 'A page with this title already exists. Please choose a different title or use the "Insert Lines" operation to update the existing page.',
+				});
 			}
-		}, `createPage(${data.title})`);
+			throw new NodeApiError(this.executeFunctions.getNode(), error, {
+				message: 'Failed to create page',
+				description: error.message || 'An error occurred while creating the page',
+			});
+		}
 	}
 
 	async insertLines(pageTitle: string, data: InsertLinesData): Promise<PageData> {
@@ -245,37 +238,18 @@ export class CosenseApiClient {
 			});
 		}
 
-		// まず既存のページを取得
-		const existingPage = await this.getPage(pageTitle);
-		
-		// 新しい行配列を作成
-		const newLines = [...existingPage.lines];
-		const textLines = data.text.split('\n');
-		
-		// 指定した行番号の後に挿入
-		newLines.splice(data.lineNumber + 1, 0, ...textLines);
-
-		const options = this.getRequestOptions('POST');
-		options.url = `${this.baseUrl}/pages/${this.projectName}/${encodeURIComponent(pageTitle)}`;
-		options.body = {
-			lines: newLines,
-		};
-
-		return this.executeWithRetry(async () => {
-			try {
-				const response = await this.executeFunctions.helpers.httpRequest(options);
-				return response as PageData;
-			} catch (error: any) {
-				if (error.response?.statusCode === 401) {
-					throw new NodeApiError(this.executeFunctions.getNode(), error, {
-						message: 'Authentication failed. Your session may have expired or the credentials are incorrect.',
-						description: this.authenticationType === 'serviceAccount' 
-							? 'Please verify your Service Account Access Key is valid and has access to this project.'
-							: 'Please get a fresh session ID from your browser cookies after logging into Cosense.',
-					});
-				}
-				throw error;
-			}
-		}, `insertLines(${pageTitle})`);
+		try {
+			// WebSocketを使用して行を挿入
+			const wsClient = new CosenseWebSocketClient({ sessionId: this.sessionId });
+			await wsClient.insertLines(this.projectName, pageTitle, data.lineNumber, data.text);
+			
+			// 更新後にページを取得して返す
+			return await this.getPage(pageTitle);
+		} catch (error: any) {
+			throw new NodeApiError(this.executeFunctions.getNode(), error, {
+				message: 'Failed to insert lines',
+				description: error.message || 'An error occurred while inserting lines',
+			});
+		}
 	}
 }

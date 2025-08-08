@@ -4,6 +4,7 @@
  */
 
 import type { JsonObject } from 'n8n-workflow';
+import { CosenseWebSocketClient } from './CosenseWebSocketClient';
 
 export interface TestCredentials {
 	authType: 'sessionCookie' | 'serviceAccount';
@@ -94,23 +95,28 @@ export class CosenseApiTestClient {
 	}
 
 	async createPage(params: { title: string; body: string }): Promise<JsonObject> {
-		const encodedTitle = encodeURIComponent(params.title);
-		return this.makeRequest('POST', `/pages/${this.projectName}/${encodedTitle}`, {
-			body: params.body,
-		});
+		if (this.headers['x-service-account-access-key']) {
+			throw new Error('Service Account authentication does not support write operations');
+		}
+		
+		const sessionId = this.headers['Cookie']?.replace('connect.sid=', '') || '';
+		const wsClient = new CosenseWebSocketClient({ sessionId });
+		await wsClient.createPage(this.projectName, params.title, params.body);
+		
+		// ページ作成後に取得して返す
+		return this.getPage({ title: params.title });
 	}
 
 	async insertLines(params: { title: string; lineNumber: number; text: string }): Promise<JsonObject> {
-		const encodedTitle = encodeURIComponent(params.title);
-		const page = await this.getPage({ title: params.title });
-		const lines = (page.lines as string[]) || [];
+		if (this.headers['x-service-account-access-key']) {
+			throw new Error('Service Account authentication does not support write operations');
+		}
 		
-		// 行を挿入
-		const newLines = [...lines];
-		newLines.splice(params.lineNumber, 0, ...params.text.split('\n'));
+		const sessionId = this.headers['Cookie']?.replace('connect.sid=', '') || '';
+		const wsClient = new CosenseWebSocketClient({ sessionId });
+		await wsClient.insertLines(this.projectName, params.title, params.lineNumber, params.text);
 		
-		return this.makeRequest('POST', `/pages/${this.projectName}/${encodedTitle}`, {
-			body: newLines.join('\n'),
-		});
+		// 更新後にページを取得して返す
+		return this.getPage({ title: params.title });
 	}
 }
