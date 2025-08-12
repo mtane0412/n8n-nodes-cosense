@@ -1,8 +1,6 @@
 /**
  * Cosense WebSocketクライアント - WebSocketベースの書き込み操作を提供
  */
-// @ts-ignore
-import { patch } from '@cosense/std/websocket';
 import type { BaseLine } from './types';
 
 export interface WebSocketCredentials {
@@ -17,6 +15,8 @@ export class CosenseWebSocketClient {
 	}
 
 	async createPage(projectName: string, title: string, content: string): Promise<void> {
+		// @ts-ignore
+		const { patch } = await import('@cosense/std/websocket');
 		const lines = content.split('\n');
 		
 		const result = await patch(projectName, title, () => {
@@ -36,6 +36,8 @@ export class CosenseWebSocketClient {
 	}
 
 	async insertLines(projectName: string, title: string, lineNumber: number, text: string): Promise<void> {
+		// @ts-ignore
+		const { patch } = await import('@cosense/std/websocket');
 		const newLines = text.split('\n');
 		
 		const result = await patch(projectName, title, (lines: BaseLine[]) => {
