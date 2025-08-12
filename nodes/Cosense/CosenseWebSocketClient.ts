@@ -3,8 +3,7 @@
  */
 // @ts-ignore
 import { patch } from '@cosense/std/websocket';
-// @ts-ignore
-import type { BaseLine } from '@cosense/types/rest';
+import type { BaseLine } from './types';
 
 export interface WebSocketCredentials {
 	sessionId: string;

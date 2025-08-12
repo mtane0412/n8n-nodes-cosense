@@ -64,7 +64,6 @@
     "n8n-workflow": "*"
   },
   "dependencies": {
-    "@cosense/std": "^0.29.14",
-    "@cosense/types": "npm:@jsr/cosense__types@^0.10.10"
+    "@cosense/std": "^0.29.14"
   }
 }
