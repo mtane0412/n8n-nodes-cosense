@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-cosense",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "n8n node for Cosense (formerly Scrapbox) - read and manage pages",
   "keywords": [
     "n8n-community-node-package",
@@ -64,6 +64,6 @@
     "n8n-workflow": "*"
   },
   "dependencies": {
-    "@cosense/std": "^0.29.14"
+    "@cosense/std": "^0.30.0"
   }
 }
