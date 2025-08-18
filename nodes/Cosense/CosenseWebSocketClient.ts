@@ -2,7 +2,7 @@
  * Cosense WebSocketクライアント - WebSocketベースの書き込み操作を提供
  */
 // @ts-ignore
-import { patch } from '@cosense/std/websocket';
+import { patch } from '@cosense/std/browser/websocket';
 // @ts-ignore
 import type { BaseLine } from '@cosense/types/rest';
 
