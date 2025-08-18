@@ -1,6 +1,6 @@
 # n8n-nodes-cosense
 
-This is an n8n community node. It lets you integrate [Cosense](https://cosense.growi.cloud/) (formerly Scrapbox) into your n8n workflows.
+This is an n8n community node. It lets you integrate [Cosense](https://scrapbox.io/) (formerly Scrapbox) into your n8n workflows.
 
 Cosense is a collaborative documentation platform that allows teams to create, share, and organize knowledge using a unique wiki-style interface with real-time collaboration features.
 
