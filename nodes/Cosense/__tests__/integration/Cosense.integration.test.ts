@@ -8,12 +8,21 @@
  * 3. npm run test:integration を実行
  */
 
+// WebSocketClientをモック
+jest.mock('../../CosenseWebSocketClient');
+
 import { CosenseApiTestClient } from '../../CosenseApiTestClient';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
 // .envファイルの読み込み
 dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+
+// fetchがnode環境で利用できるようにする
+if (typeof global.fetch === 'undefined') {
+	// @ts-ignore
+	global.fetch = require('node-fetch');
+}
 
 // 環境変数の存在チェック
 const hasSessionAuth = !!(process.env.COSENSE_PROJECT_NAME && process.env.COSENSE_SID);

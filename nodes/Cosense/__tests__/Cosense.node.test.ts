@@ -4,28 +4,19 @@
 import { NodeApiError } from 'n8n-workflow';
 import { Cosense } from '../Cosense.node';
 
+// CosenseWebSocketClientをモック
+jest.mock('../CosenseWebSocketClient');
+
 // CosenseApiClientをモック
 jest.mock('../CosenseApiClient');
 import { CosenseApiClient } from '../CosenseApiClient';
-
-// CosenseApiClientのモック
-const mockGetPage = jest.fn();
-const mockListPages = jest.fn();
-const mockSearchPages = jest.fn();
-const mockCreatePage = jest.fn();
-const mockInsertLines = jest.fn();
-
-(CosenseApiClient as jest.MockedClass<typeof CosenseApiClient>).mockImplementation(() => ({
-	getPage: mockGetPage,
-	listPages: mockListPages,
-	searchPages: mockSearchPages,
-	createPage: mockCreatePage,
-	insertLines: mockInsertLines,
-} as any));
+import { createMockApiClient } from './CosenseApiClientMock';
 
 describe('Cosense Node', () => {
 	let mockExecuteFunctions: any;
 	let cosenseNode: Cosense;
+
+	let mockApiClient: ReturnType<typeof createMockApiClient>;
 
 	beforeEach(() => {
 		// モックの初期化
@@ -37,6 +28,15 @@ describe('Cosense Node', () => {
 			getNode: jest.fn(),
 			helpers: {
 				httpRequest: jest.fn(),
+				returnJsonArray: jest.fn().mockImplementation((data) => {
+					if (Array.isArray(data)) {
+						return data.map((item, index) => ({
+							json: item,
+							pairedItem: { item: 0 },
+						}));
+					}
+					return [{ json: data, pairedItem: { item: 0 } }];
+				}),
 			},
 		};
 
@@ -57,26 +57,18 @@ describe('Cosense Node', () => {
 			parameters: {}
 		});
 		mockExecuteFunctions.continueOnFail.mockReturnValue(false);
-	});
-
-	beforeEach(() => {
-		// モックをリセット
-		mockGetPage.mockReset();
-		mockListPages.mockReset();
-		mockSearchPages.mockReset();
-		mockCreatePage.mockReset();
-		mockInsertLines.mockReset();
+		
+		// CosenseApiClientのモックをリセット
+		jest.clearAllMocks();
+		mockApiClient = createMockApiClient();
+		(CosenseApiClient as jest.MockedClass<typeof CosenseApiClient>).mockImplementation((executeFunctions, credentials, itemIndex) => mockApiClient as any);
 	});
 
 	describe('Get Page operation', () => {
-		beforeEach(() => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('page') // resource
-				.mockReturnValueOnce('get'); // operation
-		});
 
 		test('should get a page successfully', async () => {
 			const pageTitle = 'Test Page';
+			const projectName = 'test-project';
 			const mockResponse = {
 				title: pageTitle,
 				lines: ['line1', 'line2'],
@@ -84,12 +76,16 @@ describe('Cosense Node', () => {
 				updated: 1234567891,
 			};
 
-			mockExecuteFunctions.getNodeParameter.mockReturnValueOnce(pageTitle); // pageTitle
-			mockGetPage.mockResolvedValue(mockResponse);
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('get') // operation
+				.mockReturnValueOnce(pageTitle); // pageTitle
+			mockApiClient.getPage.mockResolvedValue(mockResponse);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockGetPage).toHaveBeenCalledWith(pageTitle);
+			expect(mockApiClient.getPage).toHaveBeenCalledWith(projectName, pageTitle);
 			expect(result).toEqual([[{
 				json: mockResponse,
 				pairedItem: { item: 0 },
@@ -98,42 +94,45 @@ describe('Cosense Node', () => {
 
 		test('should handle error for non-existent page', async () => {
 			const pageTitle = 'Non-existent Page';
+			const projectName = 'test-project';
 			const error = new NodeApiError(
 				{ id: 'test-node-id', name: 'Cosense', type: 'cosense', typeVersion: 1, position: [0, 0], parameters: {} },
 				{},
 				{ message: `Page "${pageTitle}" not found` }
 			);
 
-			mockExecuteFunctions.getNodeParameter.mockReturnValueOnce(pageTitle);
-			mockGetPage.mockRejectedValue(error);
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('get') // operation
+				.mockReturnValueOnce(pageTitle); // pageTitle
+			mockApiClient.getPage.mockRejectedValue(error);
 
 			await expect(cosenseNode.execute.call(mockExecuteFunctions)).rejects.toThrow(NodeApiError);
 		});
 	});
 
 	describe('List Pages operation', () => {
-		beforeEach(() => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('page') // resource
-				.mockReturnValueOnce('list'); // operation
-		});
 
 		test('should list pages successfully', async () => {
 			const limit = 10;
-			const skip = 0;
+			const projectName = 'test-project';
 			const mockResponse = [
 				{ title: 'Page 1', updated: 1234567890 },
 				{ title: 'Page 2', updated: 1234567891 },
 			];
 
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce(limit) // limit
-				.mockReturnValueOnce(skip); // skip
-			mockListPages.mockResolvedValue(mockResponse);
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('list') // operation
+				.mockReturnValueOnce(false) // returnAll
+				.mockReturnValueOnce(limit); // limit
+			mockApiClient.listPages.mockResolvedValue(mockResponse);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockListPages).toHaveBeenCalledWith(limit, skip);
+			expect(mockApiClient.listPages).toHaveBeenCalledWith(projectName, limit, 0);
 
 			expect(result).toEqual([[
 				{ json: mockResponse[0], pairedItem: { item: 0 } },
@@ -143,15 +142,10 @@ describe('Cosense Node', () => {
 	});
 
 	describe('Search Pages operation', () => {
-		beforeEach(() => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('page') // resource
-				.mockReturnValueOnce('search'); // operation
-		});
 
 		test('should search pages by title successfully', async () => {
+			const projectName = 'test-project';
 			const query = 'test query';
-			const searchType = 'title';
 			const limit = 50;
 			const mockResponse = [
 				{ title: 'Test Page 1', updated: 1234567890 },
@@ -159,14 +153,16 @@ describe('Cosense Node', () => {
 			];
 
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce(query) // query
-				.mockReturnValueOnce(searchType) // searchType
-				.mockReturnValueOnce(limit); // searchLimit
-			mockSearchPages.mockResolvedValue(mockResponse);
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('searchPageTitles') // operation
+				.mockReturnValueOnce(query) // titleQuery
+				.mockReturnValueOnce(limit); // titleSearchLimit
+			mockApiClient.searchPagesByTitle.mockResolvedValue(mockResponse);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockSearchPages).toHaveBeenCalledWith(query, 'title', limit);
+			expect(mockApiClient.searchPagesByTitle).toHaveBeenCalledWith(projectName, query, limit);
 
 			expect(result).toEqual([[
 				{ json: mockResponse[0], pairedItem: { item: 0 } },
@@ -176,21 +172,22 @@ describe('Cosense Node', () => {
 
 		test('should search pages by full text successfully', async () => {
 			const query = 'test query';
-			const searchType = 'fulltext';
-			const limit = 50;
+			const projectName = 'test-project';
 			const mockResponse = [
 				{ title: 'Test Page 1', lines: ['content with test query'], updated: 1234567890 },
 			];
 
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce(query) // query
-				.mockReturnValueOnce(searchType) // searchType
-				.mockReturnValueOnce(limit); // searchLimit
-			mockSearchPages.mockResolvedValue(mockResponse);
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('searchByFullText') // operation
+				.mockReturnValueOnce(query); // fullTextQuery
+			
+			mockApiClient.searchPagesByFullText.mockResolvedValue(mockResponse);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockSearchPages).toHaveBeenCalledWith(query, 'fulltext', limit);
+			expect(mockApiClient.searchPagesByFullText).toHaveBeenCalledWith(projectName, query);
 
 			expect(result).toEqual([[
 				{ json: mockResponse[0], pairedItem: { item: 0 } },
@@ -199,13 +196,9 @@ describe('Cosense Node', () => {
 	});
 
 	describe('Create Page operation', () => {
-		beforeEach(() => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('page') // resource
-				.mockReturnValueOnce('create'); // operation
-		});
 
 		test('should create a page successfully', async () => {
+			const projectName = 'test-project';
 			const title = 'New Page';
 			const content = 'Line 1\nLine 2\nLine 3';
 			const mockResponse = {
@@ -215,15 +208,18 @@ describe('Cosense Node', () => {
 			};
 
 			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('create') // operation
 				.mockReturnValueOnce(title) // createPageTitle
 				.mockReturnValueOnce(content); // content
-			mockCreatePage.mockResolvedValue(mockResponse);
+			mockApiClient.createPage.mockResolvedValue(mockResponse);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockCreatePage).toHaveBeenCalledWith({
+			expect(mockApiClient.createPage).toHaveBeenCalledWith(projectName, {
 				title,
-				lines: ['Line 1', 'Line 2', 'Line 3'],
+				lines: [title, 'Line 1', 'Line 2', 'Line 3'],
 			});
 			expect(result).toEqual([[{
 				json: mockResponse,
@@ -232,6 +228,7 @@ describe('Cosense Node', () => {
 		});
 
 		test('should add title as first line if content is empty', async () => {
+			const projectName = 'test-project';
 			const title = 'New Page';
 			const content = '';
 			const mockResponse = {
@@ -240,13 +237,16 @@ describe('Cosense Node', () => {
 			};
 
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce(title)
-				.mockReturnValueOnce(content);
-			mockCreatePage.mockResolvedValue(mockResponse);
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('create') // operation
+				.mockReturnValueOnce(title) // createPageTitle
+				.mockReturnValueOnce(content); // content
+			mockApiClient.createPage.mockResolvedValue(mockResponse);
 
 			await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockCreatePage).toHaveBeenCalledWith({
+			expect(mockApiClient.createPage).toHaveBeenCalledWith(projectName, {
 				title,
 				lines: [title],
 			});
@@ -254,13 +254,9 @@ describe('Cosense Node', () => {
 	});
 
 	describe('Insert Lines operation', () => {
-		beforeEach(() => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('page') // resource
-				.mockReturnValueOnce('insertLines'); // operation
-		});
 
 		test('should insert lines successfully', async () => {
+			const projectName = 'test-project';
 			const pageTitle = 'Existing Page';
 			const lineNumber = 1;
 			const text = 'Inserted Line 1\nInserted Line 2';
@@ -270,14 +266,17 @@ describe('Cosense Node', () => {
 			};
 
 			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('insertLines') // operation
 				.mockReturnValueOnce(pageTitle) // insertPageTitle
 				.mockReturnValueOnce(lineNumber) // lineNumber
 				.mockReturnValueOnce(text); // insertText
-			mockInsertLines.mockResolvedValue(mockResponse);
+			mockApiClient.insertLines.mockResolvedValue(mockResponse);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockInsertLines).toHaveBeenCalledWith(pageTitle, { lineNumber, text });
+			expect(mockApiClient.insertLines).toHaveBeenCalledWith(projectName, pageTitle, { lineNumber, text });
 			expect(result).toEqual([[{
 				json: mockResponse,
 				pairedItem: { item: 0 },
@@ -285,6 +284,7 @@ describe('Cosense Node', () => {
 		});
 
 		test('should handle insert at beginning (line 0)', async () => {
+			const projectName = 'test-project';
 			const pageTitle = 'Test Page';
 			const lineNumber = 0;
 			const text = 'First Line';
@@ -294,14 +294,17 @@ describe('Cosense Node', () => {
 			};
 
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce(pageTitle)
-				.mockReturnValueOnce(lineNumber)
-				.mockReturnValueOnce(text);
-			mockInsertLines.mockResolvedValue(mockResponse);
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('insertLines') // operation
+				.mockReturnValueOnce(pageTitle) // insertPageTitle
+				.mockReturnValueOnce(lineNumber) // lineNumber
+				.mockReturnValueOnce(text); // insertText
+			mockApiClient.insertLines.mockResolvedValue(mockResponse);
 
 			await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockInsertLines).toHaveBeenCalledWith(pageTitle, { lineNumber, text });
+			expect(mockApiClient.insertLines).toHaveBeenCalledWith(projectName, pageTitle, { lineNumber, text });
 		});
 	});
 
@@ -312,15 +315,16 @@ describe('Cosense Node', () => {
 				sessionId: '',
 			});
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('page')
-				.mockReturnValueOnce('get')
-				.mockReturnValueOnce('Public Page');
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce('test-project') // projectName
+				.mockReturnValueOnce('get') // operation
+				.mockReturnValueOnce('Public Page'); // pageTitle
 
-			mockGetPage.mockResolvedValue({ title: 'Public Page' });
+			mockApiClient.getPage.mockResolvedValue({ title: 'Public Page' });
 
 			await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockGetPage).toHaveBeenCalledWith('Public Page');
+			expect(mockApiClient.getPage).toHaveBeenCalledWith('test-project', 'Public Page');
 		});
 
 		test('should handle authentication error', async () => {
@@ -331,11 +335,12 @@ describe('Cosense Node', () => {
 			);
 
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('page')
-				.mockReturnValueOnce('create')
-				.mockReturnValueOnce('Private Page')
-				.mockReturnValueOnce('Content');
-			mockCreatePage.mockRejectedValue(error);
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce('test-project') // projectName
+				.mockReturnValueOnce('create') // operation
+				.mockReturnValueOnce('Private Page') // createPageTitle
+				.mockReturnValueOnce('Content'); // content
+			mockApiClient.createPage.mockRejectedValue(error);
 
 			await expect(cosenseNode.execute.call(mockExecuteFunctions)).rejects.toThrow(NodeApiError);
 		});
@@ -344,13 +349,15 @@ describe('Cosense Node', () => {
 	describe('Error handling', () => {
 		test('should continue on fail when enabled', async () => {
 			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+			const projectName = 'test-project';
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('page')
-				.mockReturnValueOnce('get')
-				.mockReturnValueOnce('Error Page');
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('get') // operation
+				.mockReturnValueOnce('Error Page'); // pageTitle
 
 			const error = new Error('Some error');
-			mockGetPage.mockRejectedValue(error);
+			mockApiClient.getPage.mockRejectedValue(error);
 
 			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
@@ -371,23 +378,24 @@ describe('Cosense Node', () => {
 				{ id: 'snap2', created: 1234567900 },
 			];
 
+			const projectName = 'test-project';
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('page')
-				.mockReturnValueOnce('getSnapshots')
-				.mockReturnValueOnce(pageTitle);
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('getSnapshots') // operation
+				.mockReturnValueOnce(pageTitle); // pageTitle
 
-			const mockGetPageIdByTitle = jest.fn().mockResolvedValue(pageId);
-			const mockGetPageSnapshots = jest.fn().mockResolvedValue(mockSnapshots);
-			(CosenseApiClient as any).mockImplementation(() => ({
-				getPageIdByTitle: mockGetPageIdByTitle,
-				getPageSnapshots: mockGetPageSnapshots,
-			}));
+			mockApiClient.getPageIdByTitle.mockResolvedValue(pageId);
+			mockApiClient.getPageSnapshots.mockResolvedValue(mockSnapshots);
 
-			await cosenseNode.execute.call(mockExecuteFunctions);
+			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockGetPageIdByTitle).toHaveBeenCalledWith(pageTitle);
-			expect(mockGetPageSnapshots).toHaveBeenCalledWith(pageId);
-			expect(mockExecuteFunctions.helpers.returnJsonArray).toHaveBeenCalledWith(mockSnapshots);
+			expect(mockApiClient.getPageIdByTitle).toHaveBeenCalledWith(projectName, pageTitle);
+			expect(mockApiClient.getPageSnapshots).toHaveBeenCalledWith(projectName, pageId);
+			expect(result).toEqual([[
+				{ json: mockSnapshots[0], pairedItem: { item: 0 } },
+				{ json: mockSnapshots[1], pairedItem: { item: 0 } },
+			]]);
 		});
 
 		test('should get specific page snapshot', async () => {
@@ -396,24 +404,25 @@ describe('Cosense Node', () => {
 			const timestampId = 'timestamp123';
 			const mockSnapshot = { id: 'snap1', lines: ['content'] };
 
+			const projectName = 'test-project';
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('page')
-				.mockReturnValueOnce('getSnapshot')
-				.mockReturnValueOnce(pageTitle)
-				.mockReturnValueOnce(timestampId);
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('getSnapshot') // operation
+				.mockReturnValueOnce(pageTitle) // pageTitle
+				.mockReturnValueOnce(timestampId); // timestampId
 
-			const mockGetPageIdByTitle = jest.fn().mockResolvedValue(pageId);
-			const mockGetPageSnapshotByTimestamp = jest.fn().mockResolvedValue(mockSnapshot);
-			(CosenseApiClient as any).mockImplementation(() => ({
-				getPageIdByTitle: mockGetPageIdByTitle,
-				getPageSnapshotByTimestamp: mockGetPageSnapshotByTimestamp,
-			}));
+			mockApiClient.getPageIdByTitle.mockResolvedValue(pageId);
+			mockApiClient.getPageSnapshotByTimestamp.mockResolvedValue(mockSnapshot);
 
-			await cosenseNode.execute.call(mockExecuteFunctions);
+			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockGetPageIdByTitle).toHaveBeenCalledWith(pageTitle);
-			expect(mockGetPageSnapshotByTimestamp).toHaveBeenCalledWith(pageId, timestampId);
-			expect(mockExecuteFunctions.helpers.returnJsonArray).toHaveBeenCalledWith(mockSnapshot);
+			expect(mockApiClient.getPageIdByTitle).toHaveBeenCalledWith(projectName, pageTitle);
+			expect(mockApiClient.getPageSnapshotByTimestamp).toHaveBeenCalledWith(projectName, pageId, timestampId);
+			expect(result).toEqual([[{
+				json: mockSnapshot,
+				pairedItem: { item: 0 },
+			}]]);
 		});
 
 		test('should get page commits', async () => {
@@ -424,23 +433,24 @@ describe('Cosense Node', () => {
 				{ id: 'commit2', message: 'Second commit' },
 			];
 
+			const projectName = 'test-project';
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('page')
-				.mockReturnValueOnce('getCommits')
-				.mockReturnValueOnce(pageTitle);
+				.mockReturnValueOnce('page') // resource
+				.mockReturnValueOnce(projectName) // projectName
+				.mockReturnValueOnce('getCommits') // operation
+				.mockReturnValueOnce(pageTitle); // pageTitle
 
-			const mockGetPageIdByTitle = jest.fn().mockResolvedValue(pageId);
-			const mockGetPageCommits = jest.fn().mockResolvedValue(mockCommits);
-			(CosenseApiClient as any).mockImplementation(() => ({
-				getPageIdByTitle: mockGetPageIdByTitle,
-				getPageCommits: mockGetPageCommits,
-			}));
+			mockApiClient.getPageIdByTitle.mockResolvedValue(pageId);
+			mockApiClient.getPageCommits.mockResolvedValue(mockCommits);
 
-			await cosenseNode.execute.call(mockExecuteFunctions);
+			const result = await cosenseNode.execute.call(mockExecuteFunctions);
 
-			expect(mockGetPageIdByTitle).toHaveBeenCalledWith(pageTitle);
-			expect(mockGetPageCommits).toHaveBeenCalledWith(pageId);
-			expect(mockExecuteFunctions.helpers.returnJsonArray).toHaveBeenCalledWith(mockCommits);
+			expect(mockApiClient.getPageIdByTitle).toHaveBeenCalledWith(projectName, pageTitle);
+			expect(mockApiClient.getPageCommits).toHaveBeenCalledWith(projectName, pageId);
+			expect(result).toEqual([[
+				{ json: mockCommits[0], pairedItem: { item: 0 } },
+				{ json: mockCommits[1], pairedItem: { item: 0 } },
+			]]);
 		});
 	});
 });

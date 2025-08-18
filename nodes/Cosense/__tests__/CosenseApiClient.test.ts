@@ -249,7 +249,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-			const result = await apiClient.searchPages('test-project', 'test', 'title');
+			const result = await apiClient.searchPagesByTitle('test-project', 'test');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -270,11 +270,11 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-			const result = await apiClient.searchPages('test-project', 'query', 'fulltext', 100);
+			const result = await apiClient.searchPagesByFullText('test-project', 'query');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
-				url: 'https://scrapbox.io/api/pages/test-project/search/query?q=query&limit=100',
+				url: 'https://scrapbox.io/api/pages/test-project/search/query?q=query',
 				json: true,
 				headers: {
 					Cookie: 'connect.sid=test-session',
@@ -757,7 +757,7 @@ describe('CosenseApiClient', () => {
 			(error as any).response = { statusCode: 401 };
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
 
-			await expect(apiClient.getProjectBackupList())
+			await expect(apiClient.getProjectBackupList('test-project'))
 				.rejects.toThrow('Authentication failed');
 		});
 	});
@@ -793,7 +793,7 @@ describe('CosenseApiClient', () => {
 			(error as any).response = { statusCode: 404 };
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
 
-			await expect(apiClient.getProjectBackup('nonexistent'))
+			await expect(apiClient.getProjectBackup('test-project', 'nonexistent'))
 				.rejects.toThrow('Backup with ID "nonexistent" not found');
 		});
 	});
@@ -817,7 +817,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockStream);
 
-			const result = await apiClient.getProjectStream();
+			const result = await apiClient.getProjectStream('test-project');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -840,7 +840,7 @@ describe('CosenseApiClient', () => {
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockIcon);
 
-			const result = await apiClient.getPageIcon('Page With Icon');
+			const result = await apiClient.getPageIcon('test-project', 'Page With Icon');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -858,7 +858,7 @@ describe('CosenseApiClient', () => {
 			(error as any).response = { statusCode: 404 };
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
 
-			await expect(apiClient.getPageIcon('Page Without Icon'))
+			await expect(apiClient.getPageIcon('test-project', 'Page Without Icon'))
 				.rejects.toThrow('Icon not found for page "Page Without Icon"');
 		});
 	});

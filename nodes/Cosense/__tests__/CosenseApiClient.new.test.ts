@@ -200,7 +200,7 @@ describe('CosenseApiClient - New Features', () => {
 			const mockData = { notifications: [] };
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockData);
 
-			await serviceAccountClient.getProjectNotifications();
+			await serviceAccountClient.getProjectNotifications('test-project');
 
 			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
 				method: 'GET',
@@ -281,7 +281,7 @@ describe('CosenseApiClient - New Features', () => {
 			error.response = { statusCode: 404 };
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
 
-			await expect(apiClient.getDeletedPage('nonexistent')).rejects.toThrow();
+			await expect(apiClient.getDeletedPage('test-project', 'nonexistent')).rejects.toThrow();
 		});
 	});
 
