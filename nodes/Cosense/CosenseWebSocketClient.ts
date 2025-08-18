@@ -2,7 +2,7 @@
  * Cosense WebSocketクライアント - WebSocketベースの書き込み操作を提供
  */
 // @ts-ignore
-import { patch } from '@cosense/std/esm/websocket/patch.js';
+import { patch } from '@cosense/std/websocket';
 // @ts-ignore
 import type { BaseLine } from '@cosense/types/rest';
 
@@ -19,7 +19,7 @@ export class CosenseWebSocketClient {
 
 	async createPage(projectName: string, title: string, content: string): Promise<void> {
 		const lines = content.split('\n');
-		
+
 		const result = await patch(projectName, title, () => {
 			// ページのタイトルを最初の行として、残りの内容を続く行として返す
 			return [title, ...lines];
@@ -38,7 +38,7 @@ export class CosenseWebSocketClient {
 
 	async insertLines(projectName: string, title: string, lineNumber: number, text: string): Promise<void> {
 		const newLines = text.split('\n');
-		
+
 		const result = await patch(projectName, title, (lines: BaseLine[]) => {
 			const textLines = lines.map(line => line.text);
 			// 指定された行番号に新しい行を挿入
